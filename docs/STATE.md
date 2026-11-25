@@ -9,7 +9,7 @@
 | Этап | 4 — тесты: 17 приёмочных тестов каталога, смоук и негативные сценарии, отчёт `TEST_REPORT.md` |
 | Код | `Cargo.toml`, `crates/tweaker-core`, `crates/tweaker-windows`, `crates/tweaker-app` |
 | Версия | 0.1.0 |
-| Git | `e1237a8` (этап 3), `0e5778d` (его хэш); этап 4 — коммит после аудита |
+| Git | `e2bba3b` (этап 4; этап 3 — `e1237a8`, этап 2 — `1e05d14`, этап 1 — `88de898`) |
 | Сборка | `cargo build --workspace` — успешно; `cargo build --release -p tweaker-app` — успешно |
 | Артефакт | `target/release/wintweaker.exe` — 6 740 480 байт, sha256 `AAA0B000602A010DC0A4558C31D2412EFA986A978AB9BAD12F9B3C48F41374A2` |
 | Тесты | `cargo test --workspace` — 143 passed, 1 ignored (app 17, core 82, core-tests 21, windows 23) |
