@@ -1,14 +1,18 @@
 //! Windows adapters for WinTweaker.
 //!
-//! This crate is the only place that talks to Win32: elevation, system language,
-//! OS information. The core stays platform-neutral and testable.
+//! This crate is the only place that talks to Win32 and to the real file system:
+//! elevation, system language, OS information, registry, files, processes.
+//! The core stays platform-neutral and testable.
 //!
-//! Every function here must be a thin, side-effect-free wrapper unless its name
-//! says otherwise. Starting the program does not change the system (SPEC.md 4.9).
+//! Every function here must be a thin wrapper with an explicit effect. Starting
+//! the program does not change the system (SPEC.md 4.9).
 
 #[cfg(not(windows))]
 compile_error!("tweaker-windows supports Windows only");
 
 pub mod elevation;
+pub mod files;
 pub mod locale;
 pub mod os;
+pub mod process;
+pub mod registry;

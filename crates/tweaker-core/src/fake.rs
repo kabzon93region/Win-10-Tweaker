@@ -1,0 +1,377 @@
+//! In-memory adapters.
+//!
+//! Every engine test runs on these: no registry, no files, no services, no
+//! administrator rights. A fake can be told to fail or to ignore writes, which is
+//! how the error and verification paths are covered.
+
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
+use std::path::{Path, PathBuf};
+
+use crate::action::{RegistryKey, RegistryValue, ServiceStartMode};
+use crate::adapters::{
+    AdapterError, FirewallRule, IAppx, IFileSystem, IFirewall, IProcessRunner, IRegistry,
+    IScheduler, IServiceControl, ISystemInfo, OsVersion, ProcessOutput, ServiceState,
+    ServiceStatus,
+};
+
+fn failure(message: &str) -> AdapterError {
+    AdapterError::new(message)
+}
+
+/// In-memory registry.
+#[derive(Default)]
+pub struct FakeRegistry {
+    values: RefCell<HashMap<(crate::action::RegistryRoot, String), HashMap<String, RegistryValue>>>,
+    /// When set, every write and delete fails with this text.
+    pub fail: RefCell<Option<String>>,
+    /// When set, writes report success but do not store anything (verification test).
+    pub ignore_writes: RefCell<bool>,
+}
+
+impl FakeRegistry {
+    /// Preloads a value without touching the failure switches.
+    pub fn set(&self, key: &RegistryKey, name: &str, value: RegistryValue) {
+        self.values
+            .borrow_mut()
+            .entry((key.root, key.path.clone()))
+            .or_default()
+            .insert(name.to_owned(), value);
+    }
+
+    /// Reads a value directly (test assertions).
+    pub fn get(&self, key: &RegistryKey, name: &str) -> Option<RegistryValue> {
+        self.values
+            .borrow()
+            .get(&(key.root, key.path.clone()))
+            .and_then(|values| values.get(name).cloned())
+    }
+}
+
+impl IRegistry for FakeRegistry {
+    fn read(&self, key: &RegistryKey, name: &str) -> Result<Option<RegistryValue>, AdapterError> {
+        Ok(self.get(key, name))
+    }
+
+    fn write(
+        &self,
+        key: &RegistryKey,
+        name: &str,
+        value: &RegistryValue,
+    ) -> Result<(), AdapterError> {
+        if let Some(message) = self.fail.borrow().as_ref() {
+            return Err(failure(message));
+        }
+        if *self.ignore_writes.borrow() {
+            return Ok(());
+        }
+        self.values
+            .borrow_mut()
+            .entry((key.root, key.path.clone()))
+            .or_default()
+            .insert(name.to_owned(), value.clone());
+        Ok(())
+    }
+
+    fn delete(&self, key: &RegistryKey, name: &str) -> Result<(), AdapterError> {
+        if let Some(message) = self.fail.borrow().as_ref() {
+            return Err(failure(message));
+        }
+        if *self.ignore_writes.borrow() {
+            return Ok(());
+        }
+        if let Some(values) = self
+            .values
+            .borrow_mut()
+            .get_mut(&(key.root, key.path.clone()))
+        {
+            values.remove(name);
+        }
+        Ok(())
+    }
+}
+
+/// In-memory text file system.
+#[derive(Default)]
+pub struct FakeFileSystem {
+    files: RefCell<HashMap<PathBuf, String>>,
+    /// When set, every write and delete fails with this text.
+    pub fail: RefCell<Option<String>>,
+}
+
+impl FakeFileSystem {
+    /// Preloads a file.
+    pub fn put(&self, path: impl Into<PathBuf>, content: impl Into<String>) {
+        self.files.borrow_mut().insert(path.into(), content.into());
+    }
+
+    /// Reads a file directly (test assertions).
+    pub fn get(&self, path: &Path) -> Option<String> {
+        self.files.borrow().get(path).cloned()
+    }
+}
+
+impl IFileSystem for FakeFileSystem {
+    fn exists(&self, path: &Path) -> bool {
+        self.files.borrow().contains_key(path)
+    }
+
+    fn read_text(&self, path: &Path) -> Result<Option<String>, AdapterError> {
+        Ok(self.get(path))
+    }
+
+    fn write_text(&self, path: &Path, content: &str) -> Result<(), AdapterError> {
+        if let Some(message) = self.fail.borrow().as_ref() {
+            return Err(failure(message));
+        }
+        self.files
+            .borrow_mut()
+            .insert(path.to_path_buf(), content.to_owned());
+        Ok(())
+    }
+
+    fn delete(&self, path: &Path) -> Result<(), AdapterError> {
+        if let Some(message) = self.fail.borrow().as_ref() {
+            return Err(failure(message));
+        }
+        self.files.borrow_mut().remove(path);
+        Ok(())
+    }
+}
+
+/// In-memory service manager.
+#[derive(Default)]
+pub struct FakeServiceControl {
+    services: RefCell<HashMap<String, ServiceState>>,
+    /// When set, every start/stop/configure call fails with this text.
+    pub fail: RefCell<Option<String>>,
+}
+
+impl FakeServiceControl {
+    /// Preloads a service.
+    pub fn add(&self, name: &str, state: ServiceState) {
+        self.services.borrow_mut().insert(name.to_owned(), state);
+    }
+}
+
+impl IServiceControl for FakeServiceControl {
+    fn query(&self, service: &str) -> Result<Option<ServiceState>, AdapterError> {
+        Ok(self.services.borrow().get(service).copied())
+    }
+
+    fn start(&self, service: &str) -> Result<(), AdapterError> {
+        if let Some(message) = self.fail.borrow().as_ref() {
+            return Err(failure(message));
+        }
+        let mut services = self.services.borrow_mut();
+        let state = services
+            .get_mut(service)
+            .ok_or_else(|| failure(&format!("service {service} is not installed")))?;
+        state.status = ServiceStatus::Running;
+        Ok(())
+    }
+
+    fn stop(&self, service: &str) -> Result<(), AdapterError> {
+        if let Some(message) = self.fail.borrow().as_ref() {
+            return Err(failure(message));
+        }
+        let mut services = self.services.borrow_mut();
+        let state = services
+            .get_mut(service)
+            .ok_or_else(|| failure(&format!("service {service} is not installed")))?;
+        state.status = ServiceStatus::Stopped;
+        Ok(())
+    }
+
+    fn set_start_mode(&self, service: &str, mode: ServiceStartMode) -> Result<(), AdapterError> {
+        if let Some(message) = self.fail.borrow().as_ref() {
+            return Err(failure(message));
+        }
+        let mut services = self.services.borrow_mut();
+        let state = services
+            .get_mut(service)
+            .ok_or_else(|| failure(&format!("service {service} is not installed")))?;
+        state.start_mode = mode;
+        Ok(())
+    }
+}
+
+/// In-memory program runner.
+pub struct FakeProcessRunner {
+    /// Output returned by [`IProcessRunner::run`].
+    pub output: RefCell<ProcessOutput>,
+    /// Everything that was run, in order.
+    pub runs: RefCell<Vec<(String, Vec<String>)>>,
+}
+
+impl Default for FakeProcessRunner {
+    fn default() -> Self {
+        Self {
+            output: RefCell::new(ProcessOutput {
+                code: Some(0),
+                stdout: String::new(),
+                stderr: String::new(),
+            }),
+            runs: RefCell::new(Vec::new()),
+        }
+    }
+}
+
+impl IProcessRunner for FakeProcessRunner {
+    fn run(&self, program: &str, args: &[String]) -> Result<ProcessOutput, AdapterError> {
+        self.runs
+            .borrow_mut()
+            .push((program.to_owned(), args.to_vec()));
+        Ok(self.output.borrow().clone())
+    }
+}
+
+/// In-memory firewall.
+#[derive(Default)]
+pub struct FakeFirewall {
+    rules: RefCell<HashSet<String>>,
+}
+
+impl IFirewall for FakeFirewall {
+    fn ensure_rule(&self, rule: &FirewallRule) -> Result<(), AdapterError> {
+        self.rules.borrow_mut().insert(rule.name.clone());
+        Ok(())
+    }
+
+    fn remove_rule(&self, name: &str) -> Result<(), AdapterError> {
+        self.rules.borrow_mut().remove(name);
+        Ok(())
+    }
+
+    fn has_rule(&self, name: &str) -> Result<bool, AdapterError> {
+        Ok(self.rules.borrow().contains(name))
+    }
+}
+
+/// In-memory Task Scheduler.
+#[derive(Default)]
+pub struct FakeScheduler {
+    tasks: RefCell<HashMap<String, bool>>,
+}
+
+impl FakeScheduler {
+    /// Preloads a task with its enabled state.
+    pub fn add(&self, path: &str, enabled: bool) {
+        self.tasks.borrow_mut().insert(path.to_owned(), enabled);
+    }
+}
+
+impl IScheduler for FakeScheduler {
+    fn set_enabled(&self, task_path: &str, enabled: bool) -> Result<(), AdapterError> {
+        let mut tasks = self.tasks.borrow_mut();
+        let state = tasks
+            .get_mut(task_path)
+            .ok_or_else(|| failure(&format!("task {task_path} was not found")))?;
+        *state = enabled;
+        Ok(())
+    }
+
+    fn is_enabled(&self, task_path: &str) -> Result<Option<bool>, AdapterError> {
+        Ok(self.tasks.borrow().get(task_path).copied())
+    }
+}
+
+/// In-memory Store packages.
+#[derive(Default)]
+pub struct FakeAppx {
+    installed: RefCell<HashSet<String>>,
+}
+
+impl FakeAppx {
+    /// Preloads an installed package family.
+    pub fn add(&self, family: &str) {
+        self.installed.borrow_mut().insert(family.to_owned());
+    }
+}
+
+impl IAppx for FakeAppx {
+    fn installed(&self, package_family: &str) -> Result<bool, AdapterError> {
+        Ok(self.installed.borrow().contains(package_family))
+    }
+
+    fn remove(&self, package_family: &str) -> Result<(), AdapterError> {
+        self.installed.borrow_mut().remove(package_family);
+        Ok(())
+    }
+}
+
+/// Fixed OS version.
+#[derive(Debug, Clone, Copy)]
+pub struct FakeSystemInfo {
+    /// Version reported to the engine.
+    pub version: OsVersion,
+}
+
+impl Default for FakeSystemInfo {
+    fn default() -> Self {
+        Self {
+            version: OsVersion {
+                major: 10,
+                minor: 0,
+                build: 19045,
+            },
+        }
+    }
+}
+
+impl ISystemInfo for FakeSystemInfo {
+    fn os_version(&self) -> Result<OsVersion, AdapterError> {
+        Ok(self.version)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::action::RegistryRoot;
+
+    #[test]
+    fn registry_fake_round_trips_values() {
+        let registry = FakeRegistry::default();
+        let key = RegistryKey::new(RegistryRoot::Hkcu, "Software\\Test");
+        assert_eq!(registry.read(&key, "X").expect("read"), None);
+        registry
+            .write(&key, "X", &RegistryValue::Dword(7))
+            .expect("write");
+        assert_eq!(
+            registry.read(&key, "X").expect("read"),
+            Some(RegistryValue::Dword(7))
+        );
+        registry.delete(&key, "X").expect("delete");
+        assert_eq!(registry.read(&key, "X").expect("read"), None);
+    }
+
+    #[test]
+    fn failure_switches_are_visible() {
+        let registry = FakeRegistry::default();
+        *registry.fail.borrow_mut() = Some("access denied".to_owned());
+        let key = RegistryKey::new(RegistryRoot::Hklm, "Software\\Test");
+        let error = registry
+            .write(&key, "X", &RegistryValue::Dword(1))
+            .expect_err("must fail");
+        assert_eq!(error.message, "access denied");
+    }
+
+    #[test]
+    fn service_fake_changes_state() {
+        let services = FakeServiceControl::default();
+        services.add(
+            "Demo",
+            ServiceState {
+                status: ServiceStatus::Stopped,
+                start_mode: ServiceStartMode::Manual,
+            },
+        );
+        services.start("Demo").expect("start");
+        let state = services.query("Demo").expect("query").expect("state");
+        assert_eq!(state.status, ServiceStatus::Running);
+        services.stop("Demo").expect("stop");
+        let state = services.query("Demo").expect("query").expect("state");
+        assert_eq!(state.status, ServiceStatus::Stopped);
+    }
+}
