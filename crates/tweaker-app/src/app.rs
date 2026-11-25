@@ -15,14 +15,16 @@ use tweaker_core::journal::Journal;
 use tweaker_core::logging;
 use tweaker_core::model::{RiskLevel, TweakDefinition, TweakState};
 use tweaker_core::paths::ProductPaths;
-use tweaker_core::product::{PRODUCT_VERSION, version_string};
+use tweaker_core::product::{PRODUCT_DIR_NAME, PRODUCT_VERSION, version_string};
 use tweaker_core::sections::{Section, SectionKind};
 use tweaker_windows::elevation::{self, ElevationResult};
 use tweaker_windows::files::WindowsFileSystem;
+use tweaker_windows::message;
 use tweaker_windows::process::SystemProcessRunner;
 use tweaker_windows::registry::WindowsRegistry;
 use tweaker_windows::scheduler::WindowsScheduler;
 use tweaker_windows::services::WindowsServices;
+use tweaker_windows::single_instance::SingleInstance;
 
 use crate::i18n::{self, Localizer};
 
@@ -121,11 +123,35 @@ pub fn run(mode: RunMode) -> Result<u8, String> {
         }
     }
 
+    // A second window would share the journal with the first one; automated modes
+    // are exempt so tests and screenshots can run in parallel.
+    let _instance = if matches!(mode, RunMode::Gui) {
+        match SingleInstance::acquire(&instance_name()) {
+            Ok(Some(guard)) => Some(guard),
+            Ok(None) => {
+                logger.warn("instance: another copy is already running");
+                message::info(&loc.t("instance.title"), &loc.t("instance.body"));
+                return Ok(0);
+            }
+            Err(error) => {
+                logger.error(&format!("instance: cannot take the guard: {error}"));
+                return Ok(1);
+            }
+        }
+    } else {
+        None
+    };
+
     let sections = tweaker_core::sections::load_sections()
         .map_err(|error| format!("cannot load section catalog: {error}"))?;
     logger.info(&format!("sections: {}", sections.len()));
 
     run_window(loc, paths, sections, mode)
+}
+
+/// Name of the session-local mutex that marks a running window.
+fn instance_name() -> String {
+    format!("Local\\{PRODUCT_DIR_NAME}.Instance")
 }
 
 fn run_window(

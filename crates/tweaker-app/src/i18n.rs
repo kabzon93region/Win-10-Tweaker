@@ -183,7 +183,7 @@ mod tests {
     use tweaker_core::sections::load_sections;
 
     /// Keys the UI code asks for directly.
-    const REQUIRED_KEYS: [&str; 63] = [
+    const REQUIRED_KEYS: [&str; 65] = [
         "app.title",
         "app.window",
         "app.version_label",
@@ -211,6 +211,8 @@ mod tests {
         "elevation.body",
         "elevation.failed",
         "elevation.declined",
+        "instance.title",
+        "instance.body",
         "selftest.title",
         "selftest.paths",
         "selftest.log",
@@ -250,7 +252,7 @@ mod tests {
     ];
 
     /// Exact number of interface strings shipped in each language.
-    const KEY_COUNT: usize = 125;
+    const KEY_COUNT: usize = 127;
 
     #[test]
     fn both_catalogs_load_and_have_equal_keys() {
