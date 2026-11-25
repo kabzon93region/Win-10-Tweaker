@@ -7,6 +7,7 @@
 
 pub mod action;
 pub mod adapters;
+pub mod catalog;
 pub mod engine;
 pub mod fake;
 pub mod journal;
@@ -26,6 +27,7 @@ pub use adapters::{
     IRegistry, IScheduler, IServiceControl, ISystemInfo, OsVersion, ProcessOutput, ServiceState,
     ServiceStatus,
 };
+pub use catalog::{CatalogError, load_privacy};
 pub use engine::{ApplyReport, Engine, FailedAction, PlanError, RevertReport};
 pub use journal::{AppliedOp, Journal, JournalRecord, Phase, Snapshot};
 pub use lang::Lang;

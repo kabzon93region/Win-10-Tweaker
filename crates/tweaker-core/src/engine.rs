@@ -9,7 +9,10 @@
 
 use std::fmt;
 
-use crate::action::{Action, RegistryValue, ServiceStartMode};
+use crate::action::{
+    Action, RegistryValue, ServiceStartMode, hosts_block_applied, render_hosts_block,
+    strip_hosts_block,
+};
 use crate::adapters::{
     IFileSystem, IProcessRunner, IRegistry, IServiceControl, ServiceState, ServiceStatus,
 };
@@ -381,6 +384,10 @@ impl<'a> Engine<'a> {
                 Ok(self.service_state(service)?.start_mode == *mode)
             }
             Action::ProcessRun { .. } => Ok(false),
+            Action::HostsBlock { path, domains } => {
+                let current = self.files.read_text(path).map_err(|error| error.message)?;
+                Ok(current.is_some_and(|text| hosts_block_applied(&text, domains)))
+            }
         }
     }
 
@@ -404,6 +411,10 @@ impl<'a> Engine<'a> {
                 Ok(Snapshot::Service(Some(state)))
             }
             Action::ProcessRun { .. } => Ok(Snapshot::None),
+            Action::HostsBlock { path, .. } => {
+                let current = self.files.read_text(path).map_err(|error| error.message)?;
+                Ok(Snapshot::TextFile(current))
+            }
         }
     }
 
@@ -459,6 +470,17 @@ impl<'a> Engine<'a> {
                     }
                     None => Err("program was terminated before it finished".to_owned()),
                 }
+            }
+            Action::HostsBlock { path, domains } => {
+                let current = self.files.read_text(path).map_err(|error| error.message)?;
+                let mut content = strip_hosts_block(&current.unwrap_or_default());
+                if !content.is_empty() && !content.ends_with('\n') {
+                    content.push_str("\r\n");
+                }
+                content.push_str(&render_hosts_block(domains));
+                self.files
+                    .write_text(path, &content)
+                    .map_err(|error| error.message)
             }
         }
     }
@@ -527,6 +549,17 @@ impl<'a> Engine<'a> {
                 }
             }
             Action::ProcessRun { .. } => Ok(()),
+            Action::HostsBlock { path, domains } => {
+                let current = self.files.read_text(path).map_err(|error| error.message)?;
+                if current.is_some_and(|text| hosts_block_applied(&text, domains)) {
+                    Ok(())
+                } else {
+                    Err(format!(
+                        "{}: hosts block is missing after write",
+                        path.display()
+                    ))
+                }
+            }
         }
     }
 
@@ -546,7 +579,9 @@ impl<'a> Engine<'a> {
                     .map_err(|error| error.message),
             },
             (
-                Action::FileWrite { path, .. } | Action::FileDelete { path },
+                Action::FileWrite { path, .. }
+                | Action::FileDelete { path }
+                | Action::HostsBlock { path, .. },
                 Snapshot::TextFile(previous),
             ) => match previous {
                 Some(content) => self
@@ -598,7 +633,9 @@ impl<'a> Engine<'a> {
                 }
             }
             (
-                Action::FileWrite { path, .. } | Action::FileDelete { path },
+                Action::FileWrite { path, .. }
+                | Action::FileDelete { path }
+                | Action::HostsBlock { path, .. },
                 Snapshot::TextFile(previous),
             ) => {
                 let current = self.files.read_text(path).map_err(|error| error.message)?;
@@ -1146,5 +1183,68 @@ mod tests {
         let revert = engine.revert("PRIV-01");
         assert!(revert.success(), "{revert:?}");
         assert_eq!(harness.files.get(&path).as_deref(), Some("keep me"));
+    }
+
+    #[test]
+    fn hosts_block_applies_and_reverts() {
+        let harness = Harness::new("hosts");
+        let path = PathBuf::from(r"C:\Temp\hosts");
+        let original = "127.0.0.1 localhost\r\n";
+        harness.files.put(&path, original);
+        let engine = harness.engine();
+        let definition = tweak(vec![Action::HostsBlock {
+            path: path.clone(),
+            domains: vec!["a.example".to_owned(), "b.example".to_owned()],
+        }]);
+        assert!(engine.apply_tweak(&definition).success());
+        let text = harness.files.get(&path).expect("hosts file");
+        assert!(text.contains("0.0.0.0 a.example"));
+        assert!(text.contains("0.0.0.0 b.example"));
+        assert!(text.contains("localhost"));
+        assert_eq!(engine.detect(&definition), TweakState::Applied);
+        // Applying again changes nothing.
+        assert!(engine.apply_tweak(&definition).applied.is_empty());
+        let revert = engine.revert("PRIV-01");
+        assert!(revert.success(), "{revert:?}");
+        assert_eq!(harness.files.get(&path).as_deref(), Some(original));
+    }
+
+    #[test]
+    fn hosts_block_preserves_bytes_and_separates_lines() {
+        let harness = Harness::new("hosts-bytes");
+        let path = PathBuf::from(r"C:\Temp\hosts");
+        let original = "127.0.0.1 localhost\r\n# no trailing newline";
+        harness.files.put(&path, original);
+        let engine = harness.engine();
+        let definition = tweak(vec![Action::HostsBlock {
+            path: path.clone(),
+            domains: vec!["a.example".to_owned()],
+        }]);
+        assert!(engine.apply_tweak(&definition).success());
+        let text = harness.files.get(&path).expect("hosts file");
+        assert!(
+            text.starts_with("127.0.0.1 localhost\r\n# no trailing newline\r\n"),
+            "the original bytes must stay intact: {text:?}"
+        );
+        assert!(text.contains(crate::action::HOSTS_BLOCK_START));
+        assert!(engine.revert("PRIV-01").success());
+        assert_eq!(harness.files.get(&path).as_deref(), Some(original));
+    }
+
+    #[test]
+    fn hosts_block_keeps_foreign_lines_and_ignores_other_blocks() {
+        let harness = Harness::new("hosts-foreign");
+        let path = PathBuf::from(r"C:\Temp\hosts");
+        let original = "127.0.0.1 localhost\r\n0.0.0.0 ads.example\r\n";
+        harness.files.put(&path, original);
+        let engine = harness.engine();
+        let definition = tweak(vec![Action::HostsBlock {
+            path: path.clone(),
+            domains: vec!["a.example".to_owned()],
+        }]);
+        assert!(engine.apply_tweak(&definition).success());
+        let text = harness.files.get(&path).expect("hosts file");
+        assert!(text.contains("0.0.0.0 ads.example"));
+        assert_eq!(text.matches(crate::action::HOSTS_BLOCK_START).count(), 1);
     }
 }

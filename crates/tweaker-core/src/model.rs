@@ -6,11 +6,14 @@
 
 use std::fmt;
 
+use serde::{Deserialize, Serialize};
+
 use crate::action::Action;
 use crate::journal::Snapshot;
 
 /// How dangerous a tweak is. Mirrors the 🟢/🟡/🟠/🔴 marks in `FEATURES.md`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum RiskLevel {
     /// Cosmetic change, easy to revert.
     Low,
@@ -40,7 +43,8 @@ impl RiskLevel {
 }
 
 /// One catalog item.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct TweakDefinition {
     /// Stable id, e.g. `PRIV-01`.
     pub id: String,

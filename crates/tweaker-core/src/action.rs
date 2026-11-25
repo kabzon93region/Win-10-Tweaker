@@ -223,6 +223,89 @@ pub enum Action {
         /// Arguments.
         args: Vec<String>,
     },
+    /// Insert a managed block into a hosts-style file.
+    ///
+    /// Only the block between the product markers is replaced; all other lines
+    /// stay untouched. Applying twice produces the same file.
+    HostsBlock {
+        /// File to edit, normally `C:\Windows\System32\drivers\etc\hosts`.
+        path: PathBuf,
+        /// Domains redirected to `0.0.0.0`.
+        domains: Vec<String>,
+    },
+}
+
+/// First line of the managed hosts block.
+pub const HOSTS_BLOCK_START: &str = "# >>> WinTweaker telemetry block >>>";
+/// Last line of the managed hosts block.
+pub const HOSTS_BLOCK_END: &str = "# <<< WinTweaker telemetry block <<<";
+
+/// Renders the managed block with CRLF line endings, ready to append to a hosts file.
+pub fn render_hosts_block(domains: &[String]) -> String {
+    let mut text = String::new();
+    text.push_str(HOSTS_BLOCK_START);
+    text.push_str("\r\n");
+    for domain in domains {
+        text.push_str("0.0.0.0 ");
+        text.push_str(domain);
+        text.push_str("\r\n");
+    }
+    text.push_str(HOSTS_BLOCK_END);
+    text.push_str("\r\n");
+    text
+}
+
+/// Removes the managed block, keeping every other byte as it was.
+///
+/// Only the span from the start marker line through the end marker line is cut
+/// out; line endings, trailing spaces and the bytes after the block are untouched.
+/// If the end marker is missing, nothing is removed: a half-written block must not
+/// corrupt the file.
+pub fn strip_hosts_block(content: &str) -> String {
+    let mut result = String::with_capacity(content.len());
+    let mut rest = content;
+    loop {
+        let Some(start) = find_marker_line(rest, HOSTS_BLOCK_START) else {
+            result.push_str(rest);
+            return result;
+        };
+        result.push_str(&rest[..start]);
+        let after_start = &rest[start..];
+        let Some(end) = find_marker_line(after_start, HOSTS_BLOCK_END) else {
+            // Broken block: keep the file as it is instead of guessing.
+            result.push_str(after_start);
+            return result;
+        };
+        let end_line_start = start + end;
+        let end_line_end = line_end_including_eol(&rest[end_line_start..]);
+        rest = &rest[end_line_start + end_line_end..];
+    }
+}
+
+/// Offset of the first line that equals the marker, at a line boundary.
+fn find_marker_line(text: &str, marker: &str) -> Option<usize> {
+    let mut offset = 0;
+    for line in text.split_inclusive('\n') {
+        let trimmed = line.trim_end_matches(['\r', '\n']);
+        if trimmed == marker {
+            return Some(offset);
+        }
+        offset += line.len();
+    }
+    None
+}
+
+/// Length of the first line including its terminating `\n` (if any).
+fn line_end_including_eol(text: &str) -> usize {
+    match text.find('\n') {
+        Some(position) => position + 1,
+        None => text.len(),
+    }
+}
+
+/// Whether the file already contains exactly this managed block.
+pub fn hosts_block_applied(content: &str, domains: &[String]) -> bool {
+    content.contains(&render_hosts_block(domains))
 }
 
 impl Action {
@@ -251,6 +334,13 @@ impl Action {
                     text.push_str(arg);
                 }
                 format!("run {text}")
+            }
+            Action::HostsBlock { path, domains } => {
+                format!(
+                    "hosts block: {} entries in {}",
+                    domains.len(),
+                    path.display()
+                )
             }
         }
     }
@@ -352,5 +442,58 @@ mod tests {
             }
             .is_reversible()
         );
+        assert!(
+            Action::HostsBlock {
+                path: PathBuf::from("hosts"),
+                domains: vec!["example.com".into()],
+            }
+            .is_reversible()
+        );
+    }
+
+    #[test]
+    fn hosts_block_round_trips_and_keeps_other_lines() {
+        let domains = vec!["a.example".to_owned(), "b.example".to_owned()];
+        let original = "127.0.0.1 localhost\r\n# user line\r\n";
+        let block = render_hosts_block(&domains);
+        let with_block = format!("{original}{block}");
+        assert!(hosts_block_applied(&with_block, &domains));
+
+        // Every byte outside the block must survive: same prefix and suffix.
+        let stripped = strip_hosts_block(&with_block);
+        assert_eq!(stripped, original);
+        assert!(!stripped.contains(HOSTS_BLOCK_START));
+        assert!(stripped.contains("user line"));
+    }
+
+    #[test]
+    fn hosts_strip_keeps_the_tail_after_the_block() {
+        let block = render_hosts_block(&["a.example".to_owned()]);
+        let tail = "10.0.0.1 after.example\r\n";
+        let content = format!("{block}{tail}");
+        assert_eq!(strip_hosts_block(&content), tail);
+    }
+
+    #[test]
+    fn hosts_strip_keeps_everything_without_an_end_marker() {
+        let content = format!("{HOSTS_BLOCK_START}\r\n0.0.0.0 a.example\r\n");
+        assert_eq!(strip_hosts_block(&content), content);
+    }
+
+    #[test]
+    fn hosts_block_is_idempotent() {
+        let domains = vec!["a.example".to_owned()];
+        let block = render_hosts_block(&domains);
+        let once = format!("{}{block}", strip_hosts_block(""));
+        let twice = format!("{}{block}", strip_hosts_block(&once));
+        assert_eq!(once, twice);
+        assert!(hosts_block_applied(&twice, &domains));
+    }
+
+    #[test]
+    fn hosts_block_with_other_domains_is_not_applied() {
+        let domains = vec!["a.example".to_owned()];
+        let block = render_hosts_block(&["b.example".to_owned()]);
+        assert!(!hosts_block_applied(&block, &domains));
     }
 }

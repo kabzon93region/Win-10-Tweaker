@@ -3,21 +3,22 @@
 Навигация по текущему коду. Источник истины — исходники; карта обновляется на каждом этапе,
 где меняются публичные типы, интерфейсы или поток данных.
 
-Актуально для этапа 2 (движок apply/detect/revert + журнал).
+Актуально для этапа 3, часть 1 (раздел `privacy`: каталог, hosts, службы, UI).
 
 ## Crates
 
 | Crate | Назначение |
 |---|---|
 | `crates/tweaker-core` | Модель, движок, журнал, адаптерные интерфейсы, фейки. Не знает Win32. |
-| `crates/tweaker-windows` | Реальные адаптеры: реестр, файлы, процессы, права, язык, сведения об ОС. |
+| `crates/tweaker-windows` | Реальные адаптеры: реестр, файлы, процессы, службы, права, язык, сведения об ОС. |
 | `crates/tweaker-app` | Окно egui, меню разделов, локализация, CLI-режимы, самопроверка. |
 
 ## tweaker-core
 
 | Файл | Публичные элементы | Роль |
 |---|---|---|
-| `src/action.rs` | `RegistryRoot`, `RegistryKey`, `RegistryValue`, `ServiceStartMode`, `Action` | Декларативные действия; `Action::describe()` — предпросмотр, `is_reversible()` |
+| `src/action.rs` | `RegistryRoot`, `RegistryKey`, `RegistryValue`, `ServiceStartMode`, `Action` (включая `HostsBlock`), `render_hosts_block`/`strip_hosts_block`/`hosts_block_applied` | Декларативные действия; `Action::describe()` — предпросмотр, `is_reversible()` |
+| `src/catalog.rs` | `CatalogError`, `load_privacy` | Embedded-каталог `data/tweaks/privacy.json`, валидация id/секций/ключей |
 | `src/adapters.rs` | трейты `IRegistry`, `IFileSystem`, `IServiceControl`, `IProcessRunner`, `IFirewall`, `IScheduler`, `IAppx`, `ISystemInfo`; `AdapterError`, `ServiceState`, `ServiceStatus`, `ProcessOutput`, `OsVersion`, `FirewallRule`, `FirewallDirection` | Единственный мост к системе |
 | `src/model.rs` | `RiskLevel`, `TweakDefinition`, `DefinitionError`, `TweakState`, `PlanStep`, `Plan` | Пункт каталога как данные; валидация id/ключей |
 | `src/journal.rs` | `Snapshot`, `Phase`, `JournalRecord`, `AppliedOp`, `Journal` | JSONL-журнал: две фазы, ротация, чтение, поиск неоткаченных и незавершённых операций |
@@ -35,6 +36,7 @@
 | `src/registry.rs` | `WindowsRegistry` (`IRegistry`) | winreg: чтение/запись/удаление, все типы значений |
 | `src/files.rs` | `WindowsFileSystem` (`IFileSystem`) | UTF-8 текст, создание родительских папок |
 | `src/process.rs` | `SystemProcessRunner` (`IProcessRunner`) | `std::process::Command`, код возврата и вывод |
+| `src/services.rs` | `WindowsServices` (`IServiceControl`) | SCM: состояние, старт/стоп, режим запуска |
 | `src/elevation.rs` | `is_elevated`, `ensure_elevated` | Токен администратора, перезапуск через `runas` |
 | `src/locale.rs` | `system_ui_language` | `GetUserDefaultUILanguage` → `Lang` |
 | `src/os.rs` | `os_info` | Версия ОС из реестра (только чтение) |
@@ -44,7 +46,8 @@
 | Файл | Элементы | Роль |
 |---|---|---|
 | `src/main.rs` | `Mode`, `parse_args` | `--selftest`, `--smoke`, `--screenshot <png>`, `--version`, `--help` |
-| `src/app.rs` | `RunMode`, `TweakerApp`, `install_style`, `save_screenshot` | Окно, меню 14 разделов, статус-бар, режим снимка + watchdog |
+| `src/app.rs` | публичные `RunMode`, `install_style`; приватные `TweakerApp` (реализует `eframe::App`), `PrivacyView`, `PrivacyAction`, `save_screenshot` | Окно, меню 14 разделов, раздел `privacy` (список, состояния, предпросмотр, подтверждение, apply/revert), статус-бар, режим снимка + watchdog |
+| `examples/tweak_probe.rs` | `main`, `run` | Живая проба одного пункта каталога вне окна; в релиз не входит |
 | `src/i18n.rs` | `Localizer`, `detect_lang` | ru/en из embedded JSON, форматирование `{placeholders}` |
 | `src/selftest.rs` | `run` | Проверки без окна: пути, лог, локализация, разделы, права, ОС |
 | `build.rs` | — | Манифест: release `requireAdministrator`, debug `asInvoker` |
@@ -74,11 +77,13 @@ TweakDefinition (данные каталога, этап 3)
 5. Откат идёт в обратном порядке и тоже проверяется; повторный откат — `nothing_to_revert`.
 6. `ProcessRun` необратим и в откате помечается ошибкой.
 
-## Известные пробелы (на этапе 2)
+## Известные пробелы (на этапе 3, часть 1)
 
-- Каталог `TweakDefinition` ещё не наполнен; UI не подключён к движку — этап 3.
-- Реальные адаптеры `IServiceControl`, `IFirewall`, `IScheduler`, `IAppx`, `ISystemInfo` не реализованы.
-- В `Action` пока нет действий для hosts, брандмауэра, планировщика, AppX, задач.
+- Каталог `privacy`: 11 из 17 пунктов (реестр и hosts); службы и задачи — часть 2.
+- UI подключён к движку для `privacy`; остальные разделы пока заглушка.
+- Реальные адаптеры `IFirewall`, `IScheduler`, `IAppx`, `ISystemInfo` не реализованы; действий для брандмауэра, задач и AppX в `Action` нет.
+- После отката созданный пустой ключ реестра остаётся (значение удаляется); удаление пустых ключей не реализовано.
+- Список доменов hosts собран из публичных источников и требует проверки (F-12).
 - Файловый адаптер читает только UTF-8 (для `hosts` с иной кодировкой понадобится отдельное решение).
 - Тест записи в HKCU помечен `#[ignore]`: из папки проекта запись в реестр запрещена средой;
   отдельно запущенный из `%TEMP%` бинарник теста проходит.

@@ -183,7 +183,7 @@ mod tests {
     use tweaker_core::sections::load_sections;
 
     /// Keys the UI code asks for directly.
-    const REQUIRED_KEYS: [&str; 39] = [
+    const REQUIRED_KEYS: [&str; 64] = [
         "app.title",
         "app.window",
         "app.version_label",
@@ -223,10 +223,35 @@ mod tests {
         "selftest.keys",
         "selftest.ok",
         "selftest.fail",
+        "privacy.items",
+        "privacy.partial",
+        "privacy.reload",
+        "privacy.apply",
+        "privacy.revert",
+        "privacy.selected",
+        "privacy.preview_title",
+        "privacy.confirm",
+        "privacy.cancel",
+        "privacy.no_selection",
+        "privacy.report",
+        "privacy.risk.low",
+        "privacy.risk.medium",
+        "privacy.risk.high",
+        "privacy.risk.critical",
+        "privacy.applied",
+        "privacy.not_applied",
+        "privacy.unavailable",
+        "privacy.reboot",
+        "privacy.reverted",
+        "privacy.revert_none",
+        "privacy.journal_missing",
+        "privacy.need_confirm",
+        "privacy.error",
+        "privacy.done",
     ];
 
     /// Exact number of interface strings shipped in each language.
-    const KEY_COUNT: usize = 67;
+    const KEY_COUNT: usize = 114;
 
     #[test]
     fn both_catalogs_load_and_have_equal_keys() {
@@ -247,6 +272,22 @@ mod tests {
         for lang in Lang::ALL {
             for (key, value) in localizer.catalog(lang) {
                 assert!(!value.trim().is_empty(), "empty text for {key} in {lang:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn every_catalog_tweak_has_texts_in_both_languages() {
+        let localizer = Localizer::try_load(Lang::Ru).expect("catalogs must load");
+        for tweak in tweaker_core::catalog::load_privacy().expect("privacy catalog") {
+            for key in [&tweak.title_key, &tweak.description_key] {
+                for lang in Lang::ALL {
+                    let text = localizer
+                        .catalog(lang)
+                        .get(key)
+                        .unwrap_or_else(|| panic!("missing {key} in {}", lang.code()));
+                    assert!(!text.trim().is_empty(), "empty {key} in {}", lang.code());
+                }
             }
         }
     }

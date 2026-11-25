@@ -9,11 +9,19 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use eframe::egui;
+use tweaker_core::catalog;
+use tweaker_core::engine::Engine;
+use tweaker_core::journal::Journal;
 use tweaker_core::logging;
+use tweaker_core::model::{TweakDefinition, TweakState};
 use tweaker_core::paths::ProductPaths;
 use tweaker_core::product::{PRODUCT_VERSION, version_string};
 use tweaker_core::sections::{Section, SectionKind};
 use tweaker_windows::elevation::{self, ElevationResult};
+use tweaker_windows::files::WindowsFileSystem;
+use tweaker_windows::process::SystemProcessRunner;
+use tweaker_windows::registry::WindowsRegistry;
+use tweaker_windows::services::WindowsServices;
 
 use crate::i18n::{self, Localizer};
 
@@ -228,6 +236,58 @@ struct TweakerApp {
     screenshot_state: Arc<ScreenshotState>,
     closing: bool,
     paths: ProductPaths,
+    registry: WindowsRegistry,
+    files: WindowsFileSystem,
+    services: WindowsServices,
+    processes: SystemProcessRunner,
+    journal: Option<Journal>,
+    privacy: PrivacyView,
+}
+
+/// UI state of the privacy section.
+#[derive(Default)]
+struct PrivacyView {
+    tweaks: Vec<TweakDefinition>,
+    selected: Vec<bool>,
+    states: Vec<TweakState>,
+    preview: Vec<String>,
+    pending: Vec<String>,
+    report: Option<Vec<String>>,
+}
+
+/// One click on the privacy screen.
+enum PrivacyAction {
+    Refresh,
+    BuildPreview,
+    Confirm,
+    Cancel,
+    Revert,
+    ClearReport,
+}
+
+/// One precomputed row of the privacy list.
+struct PrivacyRow {
+    title: String,
+    description: String,
+    risk: String,
+    risk_color: egui::Color32,
+    state: String,
+    state_color: egui::Color32,
+    reboot: bool,
+}
+
+fn privacy_state_text(loc: &Localizer, state: &TweakState) -> (String, egui::Color32) {
+    match state {
+        TweakState::Applied => (
+            loc.t("privacy.applied"),
+            egui::Color32::from_rgb(21, 128, 61),
+        ),
+        TweakState::NotApplied => (loc.t("privacy.not_applied"), egui::Color32::from_gray(120)),
+        TweakState::Unavailable { reason } => (
+            loc.fmt("privacy.unavailable", &[("reason", reason)]),
+            egui::Color32::from_rgb(180, 83, 9),
+        ),
+    }
 }
 
 impl TweakerApp {
@@ -239,6 +299,23 @@ impl TweakerApp {
         mode: RunMode,
         screenshot_state: Arc<ScreenshotState>,
     ) -> Self {
+        let (tweaks, selected) = match catalog::load_privacy() {
+            Ok(tweaks) => {
+                let count = tweaks.len();
+                (tweaks, vec![false; count])
+            }
+            Err(error) => {
+                logging::error(&format!("catalog: cannot load privacy: {error}"));
+                (Vec::new(), Vec::new())
+            }
+        };
+        let journal = match Journal::new(paths.journal()) {
+            Ok(journal) => Some(journal),
+            Err(error) => {
+                logging::error(&format!("journal: cannot open: {error}"));
+                None
+            }
+        };
         Self {
             loc,
             sections,
@@ -251,6 +328,16 @@ impl TweakerApp {
             screenshot_state,
             closing: false,
             paths,
+            registry: WindowsRegistry,
+            files: WindowsFileSystem,
+            services: WindowsServices,
+            processes: SystemProcessRunner,
+            journal,
+            privacy: PrivacyView {
+                tweaks,
+                selected,
+                ..PrivacyView::default()
+            },
         }
     }
 
@@ -404,6 +491,8 @@ impl TweakerApp {
         let placeholder_title = self.loc.t("placeholder.title");
         let placeholder_body = self.loc.t("placeholder.body");
         let is_about = section.id == "about";
+        let is_privacy = section.id == "privacy";
+        let declared_items = section.items;
         let about_lines = if is_about {
             self.about_lines()
         } else {
@@ -426,31 +515,393 @@ impl TweakerApp {
                     ui.add_space(10.0);
                     ui.separator();
                     ui.add_space(10.0);
-                    ui.label(egui::RichText::new(kind_text).size(13.0));
-                    ui.add_space(14.0);
-                    egui::Frame::group(ui.style())
-                        .inner_margin(egui::Margin::same(14))
-                        .show(ui, |ui| {
-                            if is_about {
-                                ui.label(egui::RichText::new(about_title).size(16.0).strong());
-                                ui.add_space(4.0);
-                                for line in &about_lines {
-                                    ui.label(line);
+                    if is_privacy {
+                        self.draw_privacy(ui, declared_items);
+                    } else {
+                        ui.label(egui::RichText::new(kind_text).size(13.0));
+                        ui.add_space(14.0);
+                        egui::Frame::group(ui.style())
+                            .inner_margin(egui::Margin::same(14))
+                            .show(ui, |ui| {
+                                if is_about {
+                                    ui.label(egui::RichText::new(about_title).size(16.0).strong());
+                                    ui.add_space(4.0);
+                                    for line in &about_lines {
+                                        ui.label(line);
+                                    }
+                                } else {
+                                    ui.label(
+                                        egui::RichText::new(placeholder_title).size(16.0).strong(),
+                                    );
+                                    ui.add_space(4.0);
+                                    ui.label(
+                                        egui::RichText::new(placeholder_body)
+                                            .size(13.5)
+                                            .color(egui::Color32::from_gray(95)),
+                                    );
                                 }
-                            } else {
-                                ui.label(
-                                    egui::RichText::new(placeholder_title).size(16.0).strong(),
-                                );
-                                ui.add_space(4.0);
-                                ui.label(
-                                    egui::RichText::new(placeholder_body)
-                                        .size(13.5)
-                                        .color(egui::Color32::from_gray(95)),
-                                );
-                            }
-                        });
+                            });
+                    }
                 });
         });
+    }
+
+    fn draw_privacy(&mut self, ui: &mut egui::Ui, declared_items: u32) {
+        if self.privacy.states.len() != self.privacy.tweaks.len() {
+            self.refresh_privacy_states();
+        }
+        let loc = &self.loc;
+        let mut rows = Vec::with_capacity(self.privacy.tweaks.len());
+        for (index, tweak) in self.privacy.tweaks.iter().enumerate() {
+            let state = self.privacy.states.get(index).cloned().unwrap_or_else(|| {
+                TweakState::Unavailable {
+                    reason: "state is not detected".to_owned(),
+                }
+            });
+            let (state_text, state_color) = privacy_state_text(loc, &state);
+            let risk_text = loc.t(&format!("privacy.risk.{}", tweak.risk.label()));
+            let risk_color = match tweak.risk {
+                tweaker_core::model::RiskLevel::Low => egui::Color32::from_rgb(21, 128, 61),
+                tweaker_core::model::RiskLevel::Medium => egui::Color32::from_gray(120),
+                tweaker_core::model::RiskLevel::High => egui::Color32::from_rgb(180, 83, 9),
+                tweaker_core::model::RiskLevel::Critical => egui::Color32::from_rgb(185, 28, 28),
+            };
+            rows.push(PrivacyRow {
+                title: loc.t(&tweak.title_key),
+                description: loc.t(&tweak.description_key),
+                risk: risk_text,
+                risk_color,
+                state: state_text,
+                state_color,
+                reboot: tweak.requires_reboot,
+            });
+        }
+        let mut selected = self.privacy.selected.clone();
+        let mut action: Option<PrivacyAction> = None;
+        let selected_count = selected.iter().filter(|value| **value).count();
+
+        ui.horizontal(|ui| {
+            if ui.button(loc.t("privacy.reload")).clicked() {
+                action = Some(PrivacyAction::Refresh);
+            }
+            if ui.button(loc.t("privacy.apply")).clicked() {
+                action = Some(PrivacyAction::BuildPreview);
+            }
+            if ui.button(loc.t("privacy.revert")).clicked() {
+                action = Some(PrivacyAction::Revert);
+            }
+            ui.label(loc.fmt(
+                "privacy.selected",
+                &[("count", &selected_count.to_string())],
+            ));
+        });
+        ui.add_space(6.0);
+        ui.label(
+            egui::RichText::new(loc.fmt(
+                "privacy.partial",
+                &[
+                    ("done", &self.privacy.tweaks.len().to_string()),
+                    ("total", &declared_items.to_string()),
+                ],
+            ))
+            .size(11.0)
+            .color(egui::Color32::from_gray(120)),
+        );
+        for (index, row) in rows.iter().enumerate() {
+            ui.horizontal(|ui| {
+                if selected.len() > index {
+                    ui.checkbox(&mut selected[index], "");
+                }
+                ui.label(egui::RichText::new(&row.title).size(14.0).strong());
+                ui.label(
+                    egui::RichText::new(&row.risk)
+                        .size(11.0)
+                        .color(row.risk_color),
+                );
+                ui.label(
+                    egui::RichText::new(&row.state)
+                        .size(11.0)
+                        .color(row.state_color),
+                );
+                if row.reboot {
+                    ui.label(
+                        egui::RichText::new(loc.t("privacy.reboot"))
+                            .size(11.0)
+                            .color(egui::Color32::from_gray(130)),
+                    );
+                }
+            })
+            .response
+            .on_hover_text(&row.description);
+        }
+
+        if !self.privacy.preview.is_empty() {
+            ui.add_space(12.0);
+            egui::Frame::group(ui.style())
+                .inner_margin(egui::Margin::same(12))
+                .show(ui, |ui| {
+                    ui.label(
+                        egui::RichText::new(loc.t("privacy.preview_title"))
+                            .size(15.0)
+                            .strong(),
+                    );
+                    ui.add_space(4.0);
+                    for line in &self.privacy.preview {
+                        ui.label(line);
+                    }
+                    ui.add_space(6.0);
+                    ui.horizontal(|ui| {
+                        if ui.button(loc.t("privacy.confirm")).clicked() {
+                            action = Some(PrivacyAction::Confirm);
+                        }
+                        if ui.button(loc.t("privacy.cancel")).clicked() {
+                            action = Some(PrivacyAction::Cancel);
+                        }
+                    });
+                });
+        }
+
+        if let Some(report) = &self.privacy.report {
+            ui.add_space(12.0);
+            egui::Frame::group(ui.style())
+                .inner_margin(egui::Margin::same(12))
+                .show(ui, |ui| {
+                    ui.label(
+                        egui::RichText::new(loc.t("privacy.report"))
+                            .size(15.0)
+                            .strong(),
+                    );
+                    ui.add_space(4.0);
+                    for line in report {
+                        ui.label(line);
+                    }
+                    ui.add_space(6.0);
+                    if ui.button(loc.t("privacy.done")).clicked() {
+                        action = Some(PrivacyAction::ClearReport);
+                    }
+                });
+        }
+
+        if selected != self.privacy.selected {
+            self.privacy.selected = selected;
+        }
+        match action {
+            Some(PrivacyAction::Refresh) => self.refresh_privacy_states(),
+            Some(PrivacyAction::BuildPreview) => self.build_privacy_preview(),
+            Some(PrivacyAction::Confirm) => self.confirm_privacy(),
+            Some(PrivacyAction::Cancel) => {
+                self.privacy.preview.clear();
+                self.privacy.pending.clear();
+            }
+            Some(PrivacyAction::Revert) => self.revert_privacy(),
+            Some(PrivacyAction::ClearReport) => self.privacy.report = None,
+            None => {}
+        }
+    }
+
+    fn engine_ready(&self) -> bool {
+        self.journal.is_some()
+    }
+
+    fn detect_privacy(&self) -> Vec<TweakState> {
+        if !self.engine_ready() {
+            return self
+                .privacy
+                .tweaks
+                .iter()
+                .map(|_| TweakState::Unavailable {
+                    reason: "the change journal is unavailable".to_owned(),
+                })
+                .collect();
+        }
+        let journal = self.journal.as_ref().expect("checked above");
+        let engine = Engine::new(
+            &self.registry,
+            &self.files,
+            &self.services,
+            &self.processes,
+            journal,
+        );
+        self.privacy
+            .tweaks
+            .iter()
+            .map(|tweak| engine.detect(tweak))
+            .collect()
+    }
+
+    fn refresh_privacy_states(&mut self) {
+        self.privacy.states = self.detect_privacy();
+    }
+
+    fn selected_tweaks(&self) -> Vec<TweakDefinition> {
+        self.privacy
+            .tweaks
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| self.privacy.selected.get(*index).copied().unwrap_or(false))
+            .map(|(_, tweak)| tweak.clone())
+            .collect()
+    }
+
+    fn build_privacy_preview(&mut self) {
+        let tweaks = self.selected_tweaks();
+        if tweaks.is_empty() {
+            self.privacy.report = Some(vec![self.loc.t("privacy.no_selection")]);
+            return;
+        }
+        if !self.engine_ready() {
+            let reason = "the change journal is unavailable".to_owned();
+            self.privacy.report = Some(vec![
+                self.loc
+                    .fmt("privacy.journal_missing", &[("reason", &reason)]),
+            ]);
+            return;
+        }
+        let journal = self.journal.as_ref().expect("checked above");
+        let engine = Engine::new(
+            &self.registry,
+            &self.files,
+            &self.services,
+            &self.processes,
+            journal,
+        );
+        let mut lines = Vec::new();
+        let mut ids = Vec::new();
+        for tweak in &tweaks {
+            let title = self.loc.t(&tweak.title_key);
+            ids.push(tweak.id.clone());
+            match engine.plan(tweak) {
+                Ok(plan) if plan.is_empty() => {
+                    lines.push(format!("{title}: {}", self.loc.t("privacy.applied")));
+                }
+                Ok(plan) => {
+                    lines.push(title);
+                    for step in plan.steps {
+                        lines.push(format!("  • {}", step.preview));
+                    }
+                }
+                Err(error) => lines.push(format!(
+                    "{title}: {}",
+                    self.loc
+                        .fmt("privacy.error", &[("message", &error.to_string())])
+                )),
+            }
+        }
+        self.privacy.preview = lines;
+        self.privacy.pending = ids;
+        self.privacy.report = None;
+    }
+
+    fn confirm_privacy(&mut self) {
+        let ids = std::mem::take(&mut self.privacy.pending);
+        if ids.is_empty() {
+            self.privacy.preview.clear();
+            return;
+        }
+        if !self.engine_ready() {
+            let reason = "the change journal is unavailable".to_owned();
+            self.privacy.report = Some(vec![
+                self.loc
+                    .fmt("privacy.journal_missing", &[("reason", &reason)]),
+            ]);
+            self.privacy.preview.clear();
+            return;
+        }
+        let journal = self.journal.as_ref().expect("checked above");
+        let engine = Engine::new(
+            &self.registry,
+            &self.files,
+            &self.services,
+            &self.processes,
+            journal,
+        );
+        let mut lines = Vec::new();
+        for id in &ids {
+            let Some(tweak) = self.privacy.tweaks.iter().find(|tweak| &tweak.id == id) else {
+                continue;
+            };
+            let title = self.loc.t(&tweak.title_key);
+            let report = engine.apply_tweak(tweak);
+            if let Some(error) = &report.error {
+                lines.push(format!(
+                    "{title}: {}",
+                    self.loc.fmt("privacy.error", &[("message", error)])
+                ));
+                continue;
+            }
+            lines.push(format!(
+                "{title}: +{} / ={} / !{}",
+                report.applied.len(),
+                report.skipped.len(),
+                report.failed.len()
+            ));
+            for failure in &report.failed {
+                lines.push(format!("  • {}", failure.error));
+            }
+        }
+        self.privacy.preview.clear();
+        self.privacy.report = Some(lines);
+        self.refresh_privacy_states();
+    }
+
+    fn revert_privacy(&mut self) {
+        let ids: Vec<String> = self
+            .selected_tweaks()
+            .into_iter()
+            .map(|tweak| tweak.id)
+            .collect();
+        if ids.is_empty() {
+            self.privacy.report = Some(vec![self.loc.t("privacy.no_selection")]);
+            return;
+        }
+        if !self.engine_ready() {
+            let reason = "the change journal is unavailable".to_owned();
+            self.privacy.report = Some(vec![
+                self.loc
+                    .fmt("privacy.journal_missing", &[("reason", &reason)]),
+            ]);
+            return;
+        }
+        let journal = self.journal.as_ref().expect("checked above");
+        let engine = Engine::new(
+            &self.registry,
+            &self.files,
+            &self.services,
+            &self.processes,
+            journal,
+        );
+        let mut lines = Vec::new();
+        for id in &ids {
+            let title = self
+                .privacy
+                .tweaks
+                .iter()
+                .find(|tweak| &tweak.id == id)
+                .map(|tweak| self.loc.t(&tweak.title_key))
+                .unwrap_or_else(|| id.clone());
+            let report = engine.revert(id);
+            if let Some(error) = &report.error {
+                lines.push(format!(
+                    "{title}: {}",
+                    self.loc.fmt("privacy.error", &[("message", error)])
+                ));
+                continue;
+            }
+            if report.nothing_to_revert {
+                lines.push(format!("{title}: {}", self.loc.t("privacy.revert_none")));
+                continue;
+            }
+            lines.push(format!(
+                "{title}: {} {}",
+                self.loc.t("privacy.reverted"),
+                report.reverted.len()
+            ));
+            for failure in &report.failed {
+                lines.push(format!("  • {}", failure.error));
+            }
+        }
+        self.privacy.report = Some(lines);
+        self.refresh_privacy_states();
     }
 
     fn about_lines(&self) -> Vec<String> {

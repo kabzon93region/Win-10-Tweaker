@@ -1,0 +1,334 @@
+[
+  {
+    "id": "PRIV-01",
+    "section": "privacy",
+    "titleKey": "tweak.PRIV-01.title",
+    "descriptionKey": "tweak.PRIV-01.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "registry_set",
+        "key": { "root": "hkcu", "path": "Software\\Microsoft\\Windows\\CurrentVersion\\AdvertisingInfo" },
+        "name": "Enabled",
+        "value": { "kind": "dword", "data": 0 }
+      },
+      {
+        "kind": "registry_set",
+        "key": { "root": "hklm", "path": "SOFTWARE\\Microsoft\\PolicyManager\\current\\device\\Bluetooth" },
+        "name": "AllowAdvertising",
+        "value": { "kind": "dword", "data": 0 }
+      }
+    ]
+  },
+  {
+    "id": "PRIV-02",
+    "section": "privacy",
+    "titleKey": "tweak.PRIV-02.title",
+    "descriptionKey": "tweak.PRIV-02.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "registry_set",
+        "key": { "root": "hkcu", "path": "Software\\Microsoft\\Windows\\CurrentVersion\\SettingSync\\Groups\\Accessibility" },
+        "name": "Enabled",
+        "value": { "kind": "dword", "data": 0 }
+      },
+      {
+        "kind": "registry_set",
+        "key": { "root": "hkcu", "path": "Software\\Microsoft\\Windows\\CurrentVersion\\SettingSync\\Groups\\BrowserSettings" },
+        "name": "Enabled",
+        "value": { "kind": "dword", "data": 0 }
+      },
+      {
+        "kind": "registry_set",
+        "key": { "root": "hkcu", "path": "Software\\Microsoft\\Windows\\CurrentVersion\\SettingSync\\Groups\\Credentials" },
+        "name": "Enabled",
+        "value": { "kind": "dword", "data": 0 }
+      },
+      {
+        "kind": "registry_set",
+        "key": { "root": "hkcu", "path": "Software\\Microsoft\\Windows\\CurrentVersion\\SettingSync\\Groups\\Language" },
+        "name": "Enabled",
+        "value": { "kind": "dword", "data": 0 }
+      },
+      {
+        "kind": "registry_set",
+        "key": { "root": "hkcu", "path": "Software\\Microsoft\\Windows\\CurrentVersion\\SettingSync\\Groups\\Personalization" },
+        "name": "Enabled",
+        "value": { "kind": "dword", "data": 0 }
+      },
+      {
+        "kind": "registry_set",
+        "key": { "root": "hkcu", "path": "Software\\Microsoft\\Windows\\CurrentVersion\\SettingSync\\Groups\\Windows" },
+        "name": "Enabled",
+        "value": { "kind": "dword", "data": 0 }
+      }
+    ]
+  },
+  {
+    "id": "PRIV-06",
+    "section": "privacy",
+    "titleKey": "tweak.PRIV-06.title",
+    "descriptionKey": "tweak.PRIV-06.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "registry_set",
+        "key": { "root": "hklm", "path": "SOFTWARE\\Policies\\Microsoft\\Windows\\AppCompat" },
+        "name": "DisableInventory",
+        "value": { "kind": "dword", "data": 1 }
+      }
+    ]
+  },
+  {
+    "id": "PRIV-07",
+    "section": "privacy",
+    "titleKey": "tweak.PRIV-07.title",
+    "descriptionKey": "tweak.PRIV-07.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "registry_set",
+        "key": { "root": "hklm", "path": "SOFTWARE\\Policies\\Microsoft\\Windows\\DataCollection" },
+        "name": "AllowTelemetry",
+        "value": { "kind": "dword", "data": 0 }
+      },
+      {
+        "kind": "registry_set",
+        "key": { "root": "hklm", "path": "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\DataCollection" },
+        "name": "AllowTelemetry",
+        "value": { "kind": "dword", "data": 0 }
+      },
+      {
+        "kind": "registry_set",
+        "key": { "root": "hklm", "path": "SOFTWARE\\Policies\\Microsoft\\Windows\\AppCompat" },
+        "name": "AITEnable",
+        "value": { "kind": "dword", "data": 0 }
+      },
+      {
+        "kind": "registry_set",
+        "key": { "root": "hkcu", "path": "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" },
+        "name": "Start_TrackProgs",
+        "value": { "kind": "dword", "data": 0 }
+      }
+    ]
+  },
+  {
+    "id": "PRIV-08",
+    "section": "privacy",
+    "titleKey": "tweak.PRIV-08.title",
+    "descriptionKey": "tweak.PRIV-08.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "registry_set",
+        "key": { "root": "hklm", "path": "SOFTWARE\\Policies\\Microsoft\\Windows\\TabletPC" },
+        "name": "PreventHandwritingDataSharing",
+        "value": { "kind": "dword", "data": 1 }
+      },
+      {
+        "kind": "registry_set",
+        "key": { "root": "hklm", "path": "SOFTWARE\\Policies\\Microsoft\\Windows\\HandwritingErrorReports" },
+        "name": "PreventHandwritingErrorReports",
+        "value": { "kind": "dword", "data": 1 }
+      },
+      {
+        "kind": "registry_set",
+        "key": { "root": "hkcu", "path": "Software\\Microsoft\\Input\\TIPC" },
+        "name": "Enabled",
+        "value": { "kind": "dword", "data": 0 }
+      }
+    ]
+  },
+  {
+    "id": "PRIV-09",
+    "section": "privacy",
+    "titleKey": "tweak.PRIV-09.title",
+    "descriptionKey": "tweak.PRIV-09.description",
+    "risk": "high",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "hosts_block",
+        "path": "C:\\Windows\\System32\\drivers\\etc\\hosts",
+        "domains": [
+          "vortex.data.microsoft.com",
+          "vortex-win.data.microsoft.com",
+          "v10.vortex-win.data.microsoft.com",
+          "settings-win.data.microsoft.com",
+          "telemetry.microsoft.com",
+          "watson.telemetry.microsoft.com",
+          "v10.events.data.microsoft.com",
+          "v10c.events.data.microsoft.com",
+          "v20.events.data.microsoft.com",
+          "us-v10.events.data.microsoft.com",
+          "eu-v10.events.data.microsoft.com",
+          "asia-v10.events.data.microsoft.com",
+          "web.vortex.data.microsoft.com",
+          "browser.events.data.microsoft.com",
+          "mobile.pipe.aria.microsoft.com",
+          "telemetry.remoteapp.windowsazure.com",
+          "telemetry.microsoft.com.nsatc.net",
+          "df.telemetry.microsoft.com",
+          "reports.wes.df.telemetry.microsoft.com",
+          "wes.df.telemetry.microsoft.com",
+          "services.wes.df.telemetry.microsoft.com",
+          "sqm.df.telemetry.microsoft.com",
+          "watson.ppe.telemetry.microsoft.com",
+          "telemetry.appex.bing.net",
+          "telemetry.urs.microsoft.com",
+          "cs1.wpc.v0cdn.net",
+          "vortex-sandbox.data.microsoft.com",
+          "pre.footprintpredict.com",
+          "i1.services.social.microsoft.com",
+          "i1.services.social.microsoft.com.nsatc.net",
+          "feedback.windows.com",
+          "feedback.microsoft-hohm.com",
+          "feedback.search.microsoft.com",
+          "rad.msn.com",
+          "preview.msn.com",
+          "choice.microsoft.com",
+          "choice.microsoft.com.nsatc.net",
+          "a.ads1.msn.com",
+          "a.ads2.msn.com",
+          "b.ads1.msn.com",
+          "b.ads2.msn.com",
+          "ads1.msads.net",
+          "ads2.msads.net",
+          "ads.msn.com",
+          "geo.prod.do.dsp.mp.microsoft.com",
+          "functional.events.data.microsoft.com",
+          "nexusrules.officeapps.live.com",
+          "office.pipe.aria.microsoft.com",
+          "self.events.data.microsoft.com",
+          "mobile.events.data.microsoft.com",
+          "vat.diag.ds.microsoft.com",
+          "diagnostics.telemetry.microsoft.com",
+          "dc.services.visualstudio.com",
+          "watson.microsoft.com",
+          "a.ads.msn.com",
+          "b.ads.msn.com",
+          "ads2.msn.com",
+          "c.msn.com",
+          "h2.msn.com",
+          "geo.ads.msn.com"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "PRIV-10",
+    "section": "privacy",
+    "titleKey": "tweak.PRIV-10.title",
+    "descriptionKey": "tweak.PRIV-10.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "registry_set",
+        "key": { "root": "hklm", "path": "SOFTWARE\\Policies\\Microsoft\\Windows\\AppCompat" },
+        "name": "DisableUAR",
+        "value": { "kind": "dword", "data": 1 }
+      },
+      {
+        "kind": "registry_set",
+        "key": { "root": "hklm", "path": "SOFTWARE\\Policies\\Microsoft\\Windows\\Personalization" },
+        "name": "NoLockScreenCamera",
+        "value": { "kind": "dword", "data": 1 }
+      }
+    ]
+  },
+  {
+    "id": "PRIV-11",
+    "section": "privacy",
+    "titleKey": "tweak.PRIV-11.title",
+    "descriptionKey": "tweak.PRIV-11.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "registry_set",
+        "key": { "root": "hklm", "path": "SOFTWARE\\Policies\\Microsoft\\Windows\\LocationAndSensors" },
+        "name": "DisableLocation",
+        "value": { "kind": "dword", "data": 1 }
+      },
+      {
+        "kind": "registry_set",
+        "key": { "root": "hklm", "path": "SOFTWARE\\Policies\\Microsoft\\Windows\\LocationAndSensors" },
+        "name": "DisableLocationScripting",
+        "value": { "kind": "dword", "data": 1 }
+      },
+      {
+        "kind": "registry_set",
+        "key": { "root": "hklm", "path": "SOFTWARE\\Policies\\Microsoft\\Windows\\LocationAndSensors" },
+        "name": "DisableWindowsLocationProvider",
+        "value": { "kind": "dword", "data": 1 }
+      }
+    ]
+  },
+  {
+    "id": "PRIV-12",
+    "section": "privacy",
+    "titleKey": "tweak.PRIV-12.title",
+    "descriptionKey": "tweak.PRIV-12.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "registry_set",
+        "key": { "root": "hkcu", "path": "Software\\Microsoft\\Siuf\\Rules" },
+        "name": "NumberOfSIUFInPeriod",
+        "value": { "kind": "dword", "data": 0 }
+      },
+      {
+        "kind": "registry_set",
+        "key": { "root": "hkcu", "path": "Software\\Microsoft\\Siuf\\Rules" },
+        "name": "PeriodInNanoSeconds",
+        "value": { "kind": "dword", "data": 0 }
+      },
+      {
+        "kind": "registry_set",
+        "key": { "root": "hklm", "path": "SOFTWARE\\Policies\\Microsoft\\Windows\\DataCollection" },
+        "name": "DoNotShowFeedbackNotifications",
+        "value": { "kind": "dword", "data": 1 }
+      }
+    ]
+  },
+  {
+    "id": "PRIV-13",
+    "section": "privacy",
+    "titleKey": "tweak.PRIV-13.title",
+    "descriptionKey": "tweak.PRIV-13.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "registry_set",
+        "key": { "root": "hklm", "path": "SOFTWARE\\Policies\\Microsoft\\Windows\\Speech" },
+        "name": "AllowSpeechModelUpdate",
+        "value": { "kind": "dword", "data": 0 }
+      }
+    ]
+  },
+  {
+    "id": "PRIV-15",
+    "section": "privacy",
+    "titleKey": "tweak.PRIV-15.title",
+    "descriptionKey": "tweak.PRIV-15.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "registry_set",
+        "key": { "root": "hklm", "path": "SOFTWARE\\Microsoft\\PolicyManager\\current\\device\\System" },
+        "name": "AllowExperimentation",
+        "value": { "kind": "dword", "data": 0 }
+      }
+    ]
+  }
+]
