@@ -1,0 +1,20 @@
+[package]
+name = "tweaker-windows"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+description = "Windows adapters for WinTweaker: elevation, system locale, OS information. Windows-only."
+
+[dependencies]
+tweaker-core = { workspace = true }
+winreg = "0.56"
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_Globalization",
+    "Win32_Security",
+    "Win32_System_Registry",
+    "Win32_System_Threading",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }

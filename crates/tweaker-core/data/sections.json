@@ -1,0 +1,100 @@
+[
+  {
+    "id": "privacy",
+    "titleKey": "section.privacy",
+    "hintKey": "hint.privacy",
+    "items": 17,
+    "kind": "catalog"
+  },
+  {
+    "id": "context",
+    "titleKey": "section.context",
+    "hintKey": "hint.context",
+    "items": 17,
+    "kind": "catalog"
+  },
+  {
+    "id": "ui",
+    "titleKey": "section.ui",
+    "hintKey": "hint.ui",
+    "items": 17,
+    "kind": "catalog"
+  },
+  {
+    "id": "system",
+    "titleKey": "section.system",
+    "hintKey": "hint.system",
+    "items": 18,
+    "kind": "catalog"
+  },
+  {
+    "id": "services",
+    "titleKey": "section.services",
+    "hintKey": "hint.services",
+    "items": 24,
+    "kind": "catalog"
+  },
+  {
+    "id": "cleaner",
+    "titleKey": "section.cleaner",
+    "hintKey": "hint.cleaner",
+    "items": 18,
+    "kind": "catalog"
+  },
+  {
+    "id": "apps",
+    "titleKey": "section.apps",
+    "hintKey": "hint.apps",
+    "items": 24,
+    "kind": "catalog"
+  },
+  {
+    "id": "autorun",
+    "titleKey": "section.autorun",
+    "hintKey": "hint.autorun",
+    "items": 5,
+    "kind": "catalog"
+  },
+  {
+    "id": "optimization",
+    "titleKey": "section.optimization",
+    "hintKey": "hint.optimization",
+    "items": 6,
+    "kind": "catalog"
+  },
+  {
+    "id": "virustotal",
+    "titleKey": "section.virustotal",
+    "hintKey": "hint.virustotal",
+    "items": 0,
+    "kind": "tool"
+  },
+  {
+    "id": "sysinfo",
+    "titleKey": "section.sysinfo",
+    "hintKey": "hint.sysinfo",
+    "items": 0,
+    "kind": "tool"
+  },
+  {
+    "id": "backup",
+    "titleKey": "section.backup",
+    "hintKey": "hint.backup",
+    "items": 4,
+    "kind": "catalog"
+  },
+  {
+    "id": "maintenance",
+    "titleKey": "section.maintenance",
+    "hintKey": "hint.maintenance",
+    "items": 6,
+    "kind": "catalog"
+  },
+  {
+    "id": "about",
+    "titleKey": "section.about",
+    "hintKey": "hint.about",
+    "items": 0,
+    "kind": "tool"
+  }
+]

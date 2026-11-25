@@ -1,0 +1,21 @@
+[package]
+name = "tweaker-app"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+description = "WinTweaker desktop application (egui/eframe)."
+
+[[bin]]
+name = "wintweaker"
+path = "src/main.rs"
+
+[dependencies]
+tweaker-core = { workspace = true }
+tweaker-windows = { workspace = true }
+serde_json = { workspace = true }
+image = { version = "0.25", default-features = false, features = ["png"] }
+eframe = { version = "0.37", default-features = false, features = ["default_fonts", "glow"] }
+
+[build-dependencies]
+embed-manifest = "1.5"
