@@ -140,7 +140,7 @@ impl<'a> Engine<'a> {
     pub fn detect(&self, tweak: &TweakDefinition) -> TweakState {
         let mut all_satisfied = true;
         for action in &tweak.actions {
-            match self.satisfied(action) {
+            match self.satisfied(&tweak.id, action) {
                 Ok(true) => {}
                 Ok(false) => all_satisfied = false,
                 Err(reason) => return TweakState::Unavailable { reason },
@@ -158,7 +158,7 @@ impl<'a> Engine<'a> {
         let mut steps = Vec::new();
         let mut skipped = Vec::new();
         for action in &tweak.actions {
-            match self.satisfied(action) {
+            match self.satisfied(&tweak.id, action) {
                 Ok(true) => skipped.push(action.clone()),
                 Ok(false) => {
                     let before = self
@@ -191,7 +191,7 @@ impl<'a> Engine<'a> {
         };
         for step in &plan.steps {
             // Re-check right before the change: the system may have changed since planning.
-            match self.satisfied(&step.action) {
+            match self.satisfied(&tweak.id, &step.action) {
                 Ok(true) => {
                     report.skipped.push(step.action.clone());
                     continue;
@@ -358,7 +358,7 @@ impl<'a> Engine<'a> {
             .ok_or_else(|| format!("service {service} is not installed"))
     }
 
-    fn satisfied(&self, action: &Action) -> Result<bool, String> {
+    fn satisfied(&self, tweak_id: &str, action: &Action) -> Result<bool, String> {
         match action {
             Action::RegistrySet { key, name, value } => {
                 let current = self
@@ -399,7 +399,17 @@ impl<'a> Engine<'a> {
             Action::ServiceStartMode { service, mode } => {
                 Ok(self.service_state(service)?.start_mode == *mode)
             }
-            Action::ProcessRun { .. } => Ok(false),
+            Action::ProcessRun { .. } | Action::ProcessRunReversible { .. } => {
+                // One-shot commands have no readable system state; an applied
+                // journal record is the only evidence that the command ran.
+                let ops = self
+                    .journal
+                    .applied_ops(None)
+                    .map_err(|error| format!("journal is unavailable: {error}"))?;
+                Ok(ops
+                    .iter()
+                    .any(|op| op.tweak_id == tweak_id && op.action == *action))
+            }
             Action::HostsBlock { path, domains } => {
                 let current = self.files.read_text(path).map_err(|error| error.message)?;
                 Ok(current.is_some_and(|text| hosts_block_applied(&text, domains)))
@@ -492,7 +502,7 @@ impl<'a> Engine<'a> {
                 let state = self.service_state(service)?;
                 Ok(Snapshot::Service(Some(state)))
             }
-            Action::ProcessRun { .. } => Ok(Snapshot::None),
+            Action::ProcessRun { .. } | Action::ProcessRunReversible { .. } => Ok(Snapshot::None),
             Action::HostsBlock { path, .. } => {
                 let current = self.files.read_text(path).map_err(|error| error.message)?;
                 Ok(Snapshot::TextFile(current))
@@ -564,24 +574,8 @@ impl<'a> Engine<'a> {
                     .set_start_mode(service, *mode)
                     .map_err(|error| error.message)
             }
-            Action::ProcessRun { program, args } => {
-                let output = self
-                    .processes
-                    .run(program, args)
-                    .map_err(|error| error.message)?;
-                match output.code {
-                    Some(0) => Ok(()),
-                    Some(code) => {
-                        let detail = output.stderr.trim();
-                        if detail.is_empty() {
-                            Err(format!("program exited with code {code}"))
-                        } else {
-                            Err(format!("program exited with code {code}: {detail}"))
-                        }
-                    }
-                    None => Err("program was terminated before it finished".to_owned()),
-                }
-            }
+            Action::ProcessRun { program, args } => self.run_process(program, args),
+            Action::ProcessRunReversible { program, args, .. } => self.run_process(program, args),
             Action::HostsBlock { path, domains } => {
                 let current = self.files.read_text(path).map_err(|error| error.message)?;
                 let mut content = strip_hosts_block(&current.unwrap_or_default());
@@ -699,7 +693,7 @@ impl<'a> Engine<'a> {
                     Err(format!("service {service} start mode was not changed"))
                 }
             }
-            Action::ProcessRun { .. } => Ok(()),
+            Action::ProcessRun { .. } | Action::ProcessRunReversible { .. } => Ok(()),
             Action::HostsBlock { path, domains } => {
                 let current = self.files.read_text(path).map_err(|error| error.message)?;
                 if current.is_some_and(|text| hosts_block_applied(&text, domains)) {
@@ -805,6 +799,14 @@ impl<'a> Engine<'a> {
                 }
                 Ok(())
             }
+            (
+                Action::ProcessRunReversible {
+                    revert_program,
+                    revert_args,
+                    ..
+                },
+                _,
+            ) => self.run_process(revert_program, revert_args),
             (Action::ProcessRun { .. }, _) => Err("this action cannot be reverted".to_owned()),
             _ => Err("journal snapshot does not match the action".to_owned()),
         }
@@ -891,8 +893,29 @@ impl<'a> Engine<'a> {
                 }
                 Ok(())
             }
+            (Action::ProcessRunReversible { .. }, _) => Ok(()),
             (Action::ProcessRun { .. }, _) => Err("this action cannot be reverted".to_owned()),
             _ => Err("journal snapshot does not match the action".to_owned()),
+        }
+    }
+
+    /// Runs an external program and treats exit code 0 as success.
+    fn run_process(&self, program: &str, args: &[String]) -> Result<(), String> {
+        let output = self
+            .processes
+            .run(program, args)
+            .map_err(|error| error.message)?;
+        match output.code {
+            Some(0) => Ok(()),
+            Some(code) => {
+                let detail = output.stderr.trim();
+                if detail.is_empty() {
+                    Err(format!("program exited with code {code}"))
+                } else {
+                    Err(format!("program exited with code {code}: {detail}"))
+                }
+            }
+            None => Err("program was terminated before it finished".to_owned()),
         }
     }
 
@@ -1293,6 +1316,55 @@ mod tests {
         assert!(!report.success());
         assert!(report.failed[0].error.contains("code 2"));
         assert_eq!(harness.processes.runs.borrow().len(), 1);
+    }
+
+    #[test]
+    fn reversible_process_runs_the_revert_command() {
+        let harness = Harness::new("process-reversible");
+        *harness.processes.output.borrow_mut() = ProcessOutput {
+            code: Some(0),
+            stdout: String::new(),
+            stderr: String::new(),
+        };
+        let engine = harness.engine();
+        let definition = tweak(vec![Action::ProcessRunReversible {
+            program: "netsh.exe".to_owned(),
+            args: vec!["set".to_owned(), "teredo".to_owned()],
+            revert_program: "netsh.exe".to_owned(),
+            revert_args: vec!["set".to_owned(), "teredo".to_owned(), "default".to_owned()],
+        }]);
+        assert!(engine.apply_tweak(&definition).success());
+        {
+            let runs = harness.processes.runs.borrow();
+            assert_eq!(runs.len(), 1);
+            assert_eq!(runs[0].0, "netsh.exe");
+            assert_eq!(runs[0].1, ["set", "teredo"]);
+        }
+        let revert = engine.revert("PRIV-01");
+        assert!(revert.success(), "{revert:?}");
+        let runs = harness.processes.runs.borrow();
+        assert_eq!(runs.len(), 2);
+        assert_eq!(runs[1].1, ["set", "teredo", "default"]);
+    }
+
+    #[test]
+    fn reversible_process_failure_is_reported() {
+        let harness = Harness::new("process-reversible-fail");
+        *harness.processes.output.borrow_mut() = ProcessOutput {
+            code: Some(1),
+            stdout: String::new(),
+            stderr: "denied".to_owned(),
+        };
+        let engine = harness.engine();
+        let definition = tweak(vec![Action::ProcessRunReversible {
+            program: "netsh.exe".to_owned(),
+            args: vec!["set".to_owned()],
+            revert_program: "netsh.exe".to_owned(),
+            revert_args: vec!["reset".to_owned()],
+        }]);
+        let report = engine.apply_tweak(&definition);
+        assert!(!report.success());
+        assert!(report.failed[0].error.contains("code 1"), "{report:?}");
     }
 
     #[test]

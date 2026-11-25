@@ -238,6 +238,21 @@ pub enum Action {
         /// Arguments.
         args: Vec<String>,
     },
+    /// Run an external program whose effect is undone by another command.
+    ///
+    /// Used for documented `netsh`/PowerShell toggles: the engine cannot read the
+    /// result back, so apply and revert are considered successful when the command
+    /// exits with code 0.
+    ProcessRunReversible {
+        /// Executable for the forward command.
+        program: String,
+        /// Arguments of the forward command.
+        args: Vec<String>,
+        /// Executable for the revert command.
+        revert_program: String,
+        /// Arguments of the revert command.
+        revert_args: Vec<String>,
+    },
     /// Insert a managed block into a hosts-style file.
     ///
     /// Only the block between the product markers is replaced; all other lines
@@ -378,6 +393,26 @@ impl Action {
                     text.push_str(arg);
                 }
                 format!("run {text}")
+            }
+            Action::ProcessRunReversible {
+                program,
+                args,
+                revert_program,
+                revert_args,
+            } => {
+                let mut text = program.clone();
+                for arg in args {
+                    text.push(' ');
+                    text.push_str(arg);
+                }
+                text.push_str(" (revert: ");
+                text.push_str(revert_program);
+                for arg in revert_args {
+                    text.push(' ');
+                    text.push_str(arg);
+                }
+                text.push(')');
+                text
             }
             Action::HostsBlock { path, domains } => {
                 format!(

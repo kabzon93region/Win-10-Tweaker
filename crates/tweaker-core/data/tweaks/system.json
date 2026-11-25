@@ -1,0 +1,1034 @@
+[
+    {
+        "id":  "SYS-01",
+        "section":  "system",
+        "titleKey":  "tweak.SYS-01.title",
+        "descriptionKey":  "tweak.SYS-01.description",
+        "risk":  "low",
+        "requiresReboot":  false,
+        "actions":  [
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcu",
+                                        "path":  "Software\\Microsoft\\Windows\\CurrentVersion\\Notifications\\Settings\\Windows.SystemToast.SecurityAndMaintenance"
+                                    },
+                            "name":  "Enabled",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  0
+                                      }
+                        }
+                    ]
+    },
+    {
+        "id":  "SYS-02",
+        "section":  "system",
+        "titleKey":  "tweak.SYS-02.title",
+        "descriptionKey":  "tweak.SYS-02.description",
+        "risk":  "high",
+        "requiresReboot":  false,
+        "actions":  [
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcu",
+                                        "path":  "Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings\\Zones\\3"
+                                    },
+                            "name":  "1806",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  0
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hklm",
+                                        "path":  "SOFTWARE\\Microsoft\\Internet Explorer\\Security"
+                                    },
+                            "name":  "DisableSecuritySettingsCheck",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  1
+                                      }
+                        }
+                    ]
+    },
+    {
+        "id":  "SYS-03",
+        "section":  "system",
+        "titleKey":  "tweak.SYS-03.title",
+        "descriptionKey":  "tweak.SYS-03.description",
+        "risk":  "critical",
+        "requiresReboot":  true,
+        "actions":  [
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hklm",
+                                        "path":  "SOFTWARE\\Policies\\Microsoft\\Windows Defender"
+                                    },
+                            "name":  "DisableAntiSpyware",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  1
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hklm",
+                                        "path":  "SOFTWARE\\Policies\\Microsoft\\Windows\\System"
+                                    },
+                            "name":  "EnableSmartScreen",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  0
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hklm",
+                                        "path":  "SOFTWARE\\Policies\\Microsoft\\MicrosoftEdge\\PhishingFilter"
+                                    },
+                            "name":  "EnabledV9",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  0
+                                      }
+                        },
+                        {
+                            "kind":  "registry_delete",
+                            "key":  {
+                                        "root":  "hkcu",
+                                        "path":  "Software\\Microsoft\\Windows\\CurrentVersion\\Run"
+                                    },
+                            "name":  "SecurityHealth"
+                        },
+                        {
+                            "kind":  "registry_delete",
+                            "key":  {
+                                        "root":  "hklm",
+                                        "path":  "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run"
+                                    },
+                            "name":  "SecurityHealth"
+                        },
+                        {
+                            "kind":  "registry_delete",
+                            "key":  {
+                                        "root":  "hklm",
+                                        "path":  "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run"
+                                    },
+                            "name":  "WindowsDefender"
+                        },
+                        {
+                            "kind":  "service_stop",
+                            "service":  "WinDefend"
+                        },
+                        {
+                            "kind":  "service_start_mode",
+                            "service":  "WinDefend",
+                            "mode":  "disabled"
+                        },
+                        {
+                            "kind":  "service_stop",
+                            "service":  "SecurityHealthService"
+                        },
+                        {
+                            "kind":  "service_start_mode",
+                            "service":  "SecurityHealthService",
+                            "mode":  "disabled"
+                        },
+                        {
+                            "kind":  "service_stop",
+                            "service":  "wscsvc"
+                        },
+                        {
+                            "kind":  "service_start_mode",
+                            "service":  "wscsvc",
+                            "mode":  "disabled"
+                        },
+                        {
+                            "kind":  "service_stop",
+                            "service":  "smartscreen"
+                        },
+                        {
+                            "kind":  "service_start_mode",
+                            "service":  "smartscreen",
+                            "mode":  "disabled"
+                        }
+                    ]
+    },
+    {
+        "id":  "SYS-04",
+        "section":  "system",
+        "titleKey":  "tweak.SYS-04.title",
+        "descriptionKey":  "tweak.SYS-04.description",
+        "risk":  "critical",
+        "requiresReboot":  true,
+        "actions":  [
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hklm",
+                                        "path":  "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System"
+                                    },
+                            "name":  "EnableLUA",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  0
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hklm",
+                                        "path":  "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System"
+                                    },
+                            "name":  "ConsentPromptBehaviorAdmin",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  0
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hklm",
+                                        "path":  "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System"
+                                    },
+                            "name":  "PromptOnSecureDesktop",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  0
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hklm",
+                                        "path":  "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System"
+                                    },
+                            "name":  "EnableInstallerDetection",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  0
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hklm",
+                                        "path":  "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System"
+                                    },
+                            "name":  "EnableSecureUIAPaths",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  0
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hklm",
+                                        "path":  "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System"
+                                    },
+                            "name":  "EnableVirtualization",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  0
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hklm",
+                                        "path":  "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System"
+                                    },
+                            "name":  "FilterAdministratorToken",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  0
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hklm",
+                                        "path":  "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System"
+                                    },
+                            "name":  "EnableUIADesktopToggle",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  0
+                                      }
+                        }
+                    ]
+    },
+    {
+        "id":  "SYS-05",
+        "section":  "system",
+        "titleKey":  "tweak.SYS-05.title",
+        "descriptionKey":  "tweak.SYS-05.description",
+        "risk":  "medium",
+        "requiresReboot":  false,
+        "actions":  [
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcu",
+                                        "path":  "Keyboard Layout\\Toggle"
+                                    },
+                            "name":  "Hotkey",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  2
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcu",
+                                        "path":  "Keyboard Layout\\Toggle"
+                                    },
+                            "name":  "Language Hotkey",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  2
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcu",
+                                        "path":  "Keyboard Layout\\Toggle"
+                                    },
+                            "name":  "Layout Hotkey",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  3
+                                      }
+                        }
+                    ]
+    },
+    {
+        "id":  "SYS-06",
+        "section":  "system",
+        "titleKey":  "tweak.SYS-06.title",
+        "descriptionKey":  "tweak.SYS-06.description",
+        "risk":  "low",
+        "requiresReboot":  false,
+        "actions":  [
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hklm",
+                                        "path":  "SYSTEM\\CurrentControlSet\\Control\\Power\\PowerSettings\\7516b95f-f776-4464-8c53-06167f40cc99\\8EC4B3A5-6868-48c2-BE75-4F3044BE88A7"
+                                    },
+                            "name":  "Attributes",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  2
+                                      }
+                        }
+                    ]
+    },
+    {
+        "id":  "SYS-07",
+        "section":  "system",
+        "titleKey":  "tweak.SYS-07.title",
+        "descriptionKey":  "tweak.SYS-07.description",
+        "risk":  "medium",
+        "requiresReboot":  false,
+        "actions":  [
+                        {
+                            "kind":  "task_set_enabled_matching",
+                            "folder":  "\\Microsoft\\Windows\\MemoryDiagnostic",
+                            "prefixes":  [
+
+                                         ],
+                            "enabled":  false,
+                            "optional":  false
+                        }
+                    ]
+    },
+    {
+        "id":  "SYS-08",
+        "section":  "system",
+        "titleKey":  "tweak.SYS-08.title",
+        "descriptionKey":  "tweak.SYS-08.description",
+        "risk":  "high",
+        "requiresReboot":  false,
+        "actions":  [
+                        {
+                            "kind":  "process_run_reversible",
+                            "program":  "netsh.exe",
+                            "args":  [
+                                         "interface",
+                                         "teredo",
+                                         "set",
+                                         "state",
+                                         "disabled"
+                                     ],
+                            "revert_program":  "netsh.exe",
+                            "revert_args":  [
+                                                "interface",
+                                                "teredo",
+                                                "set",
+                                                "state",
+                                                "default"
+                                            ]
+                        },
+                        {
+                            "kind":  "process_run_reversible",
+                            "program":  "netsh.exe",
+                            "args":  [
+                                         "interface",
+                                         "isatap",
+                                         "set",
+                                         "state",
+                                         "disabled"
+                                     ],
+                            "revert_program":  "netsh.exe",
+                            "revert_args":  [
+                                                "interface",
+                                                "isatap",
+                                                "set",
+                                                "state",
+                                                "default"
+                                            ]
+                        },
+                        {
+                            "kind":  "process_run_reversible",
+                            "program":  "netsh.exe",
+                            "args":  [
+                                         "interface",
+                                         "6to4",
+                                         "set",
+                                         "state",
+                                         "disabled"
+                                     ],
+                            "revert_program":  "netsh.exe",
+                            "revert_args":  [
+                                                "interface",
+                                                "6to4",
+                                                "set",
+                                                "state",
+                                                "default"
+                                            ]
+                        },
+                        {
+                            "kind":  "process_run_reversible",
+                            "program":  "netsh.exe",
+                            "args":  [
+                                         "interface",
+                                         "ipv6",
+                                         "set",
+                                         "global",
+                                         "randomizeidentifiers=disabled"
+                                     ],
+                            "revert_program":  "netsh.exe",
+                            "revert_args":  [
+                                                "interface",
+                                                "ipv6",
+                                                "set",
+                                                "global",
+                                                "randomizeidentifiers=enabled"
+                                            ]
+                        },
+                        {
+                            "kind":  "process_run_reversible",
+                            "program":  "netsh.exe",
+                            "args":  [
+                                         "interface",
+                                         "ipv6",
+                                         "set",
+                                         "privacy",
+                                         "state=disabled"
+                                     ],
+                            "revert_program":  "netsh.exe",
+                            "revert_args":  [
+                                                "interface",
+                                                "ipv6",
+                                                "set",
+                                                "privacy",
+                                                "state=enabled"
+                                            ]
+                        }
+                    ]
+    },
+    {
+        "id":  "SYS-09",
+        "section":  "system",
+        "titleKey":  "tweak.SYS-09.title",
+        "descriptionKey":  "tweak.SYS-09.description",
+        "risk":  "medium",
+        "requiresReboot":  false,
+        "actions":  [
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hklm",
+                                        "path":  "SOFTWARE\\Microsoft\\Speech_OneCore\\Preferences"
+                                    },
+                            "name":  "ModelDownloadAllowed",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  0
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hklm",
+                                        "path":  "SOFTWARE\\Policies\\Microsoft\\Windows\\Windows Search"
+                                    },
+                            "name":  "AllowCloudSearch",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  0
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hklm",
+                                        "path":  "SOFTWARE\\Policies\\Microsoft\\Windows\\Windows Search"
+                                    },
+                            "name":  "AllowSearchToUseLocation",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  0
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hklm",
+                                        "path":  "SOFTWARE\\Policies\\Microsoft\\Windows\\Windows Search"
+                                    },
+                            "name":  "ConnectedSearchUseWeb",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  0
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hklm",
+                                        "path":  "SOFTWARE\\Policies\\Microsoft\\Windows\\Windows Search"
+                                    },
+                            "name":  "DisableWebSearch",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  1
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hklm",
+                                        "path":  "SOFTWARE\\Policies\\Microsoft\\Windows\\Windows Search"
+                                    },
+                            "name":  "AllowCortana",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  0
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcu",
+                                        "path":  "Software\\Microsoft\\Windows\\CurrentVersion\\Search"
+                                    },
+                            "name":  "CortanaConsent",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  0
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcu",
+                                        "path":  "Software\\Microsoft\\InputPersonalization"
+                                    },
+                            "name":  "HarvestContacts",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  0
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcu",
+                                        "path":  "Software\\Microsoft\\InputPersonalization"
+                                    },
+                            "name":  "RestrictImplicitInkCollection",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  1
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcu",
+                                        "path":  "Software\\Microsoft\\InputPersonalization"
+                                    },
+                            "name":  "RestrictImplicitTextCollection",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  1
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcu",
+                                        "path":  "Software\\Microsoft\\Personalization\\Settings"
+                                    },
+                            "name":  "AcceptedPrivacyPolicy",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  0
+                                      }
+                        }
+                    ]
+    },
+    {
+        "id":  "SYS-10",
+        "section":  "system",
+        "titleKey":  "tweak.SYS-10.title",
+        "descriptionKey":  "tweak.SYS-10.description",
+        "risk":  "medium",
+        "requiresReboot":  false,
+        "actions":  [
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcu",
+                                        "path":  "Software\\Microsoft\\Internet Explorer\\Main"
+                                    },
+                            "name":  "Start Page",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "https://www.google.com"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcu",
+                                        "path":  "Software\\Microsoft\\Internet Explorer\\Main"
+                                    },
+                            "name":  "DisableFirstRunCustomize",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  1
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hklm",
+                                        "path":  "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Internet Settings"
+                                    },
+                            "name":  "EnableActiveProbing",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  0
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcu",
+                                        "path":  "Software\\Microsoft\\Internet Explorer\\Suggested Sites"
+                                    },
+                            "name":  "SuggestedSitesEnabled",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  0
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcu",
+                                        "path":  "Software\\Microsoft\\Internet Explorer\\Main"
+                                    },
+                            "name":  "Search Page",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "https://www.google.com/search?q=%s"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcu",
+                                        "path":  "Software\\Microsoft\\Internet Explorer\\Main"
+                                    },
+                            "name":  "Search Bar",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "https://www.google.com/search?q=%s"
+                                      }
+                        }
+                    ]
+    },
+    {
+        "id":  "SYS-11",
+        "section":  "system",
+        "titleKey":  "tweak.SYS-11.title",
+        "descriptionKey":  "tweak.SYS-11.description",
+        "risk":  "low",
+        "requiresReboot":  false,
+        "actions":  [
+                        {
+                            "kind":  "process_run_reversible",
+                            "program":  "powershell.exe",
+                            "args":  [
+                                         "-NoProfile",
+                                         "-ExecutionPolicy",
+                                         "Bypass",
+                                         "-Command",
+                                         "$ErrorActionPreference=\u0027Stop\u0027; try { $d=Join-Path $env:USERPROFILE \u0027Desktop\\WinTweaker\u0027; New-Item -ItemType Directory -Force -Path $d | Out-Null; Set-Content -Path (Join-Path $d \u0027reboot.vbs\u0027) -Value \u0027CreateObject(\"Shell.Application\").ShutdownWindows\u0027 -Encoding ASCII; Set-Content -Path (Join-Path $d \u0027refresh.vbs\u0027) -Value \u0027Set sh = CreateObject(\"WScript.Shell\"): sh.Run \"ie4uinit.exe -show\", 0, False\u0027 -Encoding ASCII; $s=New-Object -ComObject WScript.Shell; $l=$s.CreateShortcut((Join-Path $d \u0027Перезагрузка.lnk\u0027)); $l.TargetPath=(Join-Path $d \u0027reboot.vbs\u0027); $l.Save(); $l2=$s.CreateShortcut((Join-Path $d \u0027Обновить оболочку.lnk\u0027)); $l2.TargetPath=(Join-Path $d \u0027refresh.vbs\u0027); $l2.Save() } catch { Write-Error $_; exit 1 }"
+                                     ],
+                            "revert_program":  "powershell.exe",
+                            "revert_args":  [
+                                                "-NoProfile",
+                                                "-ExecutionPolicy",
+                                                "Bypass",
+                                                "-Command",
+                                                "Remove-Item -Recurse -Force (Join-Path $env:USERPROFILE \u0027Desktop\\WinTweaker\u0027) -ErrorAction SilentlyContinue"
+                                            ]
+                        }
+                    ]
+    },
+    {
+        "id":  "SYS-12",
+        "section":  "system",
+        "titleKey":  "tweak.SYS-12.title",
+        "descriptionKey":  "tweak.SYS-12.description",
+        "risk":  "medium",
+        "requiresReboot":  false,
+        "actions":  [
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hklm",
+                                        "path":  "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management"
+                                    },
+                            "name":  "LargeSystemCache",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  1
+                                      }
+                        }
+                    ]
+    },
+    {
+        "id":  "SYS-13",
+        "section":  "system",
+        "titleKey":  "tweak.SYS-13.title",
+        "descriptionKey":  "tweak.SYS-13.description",
+        "risk":  "low",
+        "requiresReboot":  false,
+        "actions":  [
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcu",
+                                        "path":  "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Serialize"
+                                    },
+                            "name":  "StartupDelayInMsec",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  0
+                                      }
+                        }
+                    ]
+    },
+    {
+        "id":  "SYS-14",
+        "section":  "system",
+        "titleKey":  "tweak.SYS-14.title",
+        "descriptionKey":  "tweak.SYS-14.description",
+        "risk":  "low",
+        "requiresReboot":  false,
+        "actions":  [
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcu",
+                                        "path":  "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer"
+                                    },
+                            "name":  "ShowRecent",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  0
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcu",
+                                        "path":  "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer"
+                                    },
+                            "name":  "ShowFrequent",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  0
+                                      }
+                        }
+                    ]
+    },
+    {
+        "id":  "SYS-15",
+        "section":  "system",
+        "titleKey":  "tweak.SYS-15.title",
+        "descriptionKey":  "tweak.SYS-15.description",
+        "risk":  "low",
+        "requiresReboot":  false,
+        "actions":  [
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hklm",
+                                        "path":  "SOFTWARE\\Microsoft\\Input\\Settings"
+                                    },
+                            "name":  "EnableExpressiveInputShellHotkey",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  1
+                                      }
+                        }
+                    ]
+    },
+    {
+        "id":  "SYS-16",
+        "section":  "system",
+        "titleKey":  "tweak.SYS-16.title",
+        "descriptionKey":  "tweak.SYS-16.description",
+        "risk":  "medium",
+        "requiresReboot":  false,
+        "actions":  [
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "CLSID\\{FFE2A43C-56B9-4bf5-9A79-CC6D4285608A}\\InprocServer32"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "expand_string",
+                                          "data":  "%ProgramFiles%\\Windows Photo Viewer\\PhotoViewer.dll"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "CLSID\\{FFE2A43C-56B9-4bf5-9A79-CC6D4285608A}\\InprocServer32"
+                                    },
+                            "name":  "ThreadingModel",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "Apartment"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "PhotoViewer.FileAssoc.Bitmap\\DefaultIcon"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "expand_string",
+                                          "data":  "%ProgramFiles%\\Windows Photo Viewer\\PhotoViewer.dll,0"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "PhotoViewer.FileAssoc.Bitmap\\shell\\open\\command"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "expand_string",
+                                          "data":  "%ProgramFiles%\\Windows Photo Viewer\\PhotoViewer.dll,0"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  ".bmp\\OpenWithProgids"
+                                    },
+                            "name":  "PhotoViewer.FileAssoc.Bitmap",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  ""
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  ".gif\\OpenWithProgids"
+                                    },
+                            "name":  "PhotoViewer.FileAssoc.Bitmap",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  ""
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  ".jpeg\\OpenWithProgids"
+                                    },
+                            "name":  "PhotoViewer.FileAssoc.Bitmap",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  ""
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  ".jpg\\OpenWithProgids"
+                                    },
+                            "name":  "PhotoViewer.FileAssoc.Bitmap",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  ""
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  ".png\\OpenWithProgids"
+                                    },
+                            "name":  "PhotoViewer.FileAssoc.Bitmap",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  ""
+                                      }
+                        }
+                    ]
+    },
+    {
+        "id":  "SYS-17",
+        "section":  "system",
+        "titleKey":  "tweak.SYS-17.title",
+        "descriptionKey":  "tweak.SYS-17.description",
+        "risk":  "critical",
+        "requiresReboot":  true,
+        "actions":  [
+                        {
+                            "kind":  "process_run_reversible",
+                            "program":  "powershell.exe",
+                            "args":  [
+                                         "-NoProfile",
+                                         "-ExecutionPolicy",
+                                         "Bypass",
+                                         "-Command",
+                                         "$ErrorActionPreference=\u0027Stop\u0027; \u0026 \"$env:SystemRoot\\System32\\OneDriveSetup.exe\" /uninstall; $code=$LASTEXITCODE; if ($code -ne 0) { exit $code }; try { $folder=Join-Path $env:USERPROFILE \u0027OneDrive\u0027; $shortcut=Join-Path $env:USERPROFILE \u0027Desktop\\OneDrive.lnk\u0027; foreach ($p in @($folder,$shortcut)) { if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Recurse -Force -ErrorAction Stop } } } catch { Write-Error $_; exit 1 }"
+                                     ],
+                            "revert_program":  "C:\\Windows\\System32\\OneDriveSetup.exe",
+                            "revert_args":  [
+
+                                            ]
+                        },
+                        {
+                            "kind":  "registry_delete",
+                            "key":  {
+                                        "root":  "hkcu",
+                                        "path":  "Software\\Microsoft\\Windows\\CurrentVersion\\Run"
+                                    },
+                            "name":  "OneDrive"
+                        },
+                        {
+                            "kind":  "registry_delete",
+                            "key":  {
+                                        "root":  "hklm",
+                                        "path":  "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run"
+                                    },
+                            "name":  "OneDrive"
+                        },
+                        {
+                            "kind":  "registry_delete_key",
+                            "key":  {
+                                        "root":  "hkcu",
+                                        "path":  "Software\\Classes\\CLSID\\{018D5C66-4533-4307-9B53-224DE2ED1FE6}"
+                                    }
+                        },
+                        {
+                            "kind":  "registry_delete_key",
+                            "key":  {
+                                        "root":  "hklm",
+                                        "path":  "SOFTWARE\\Classes\\CLSID\\{018D5C66-4533-4307-9B53-224DE2ED1FE6}"
+                                    }
+                        }
+                    ]
+    },
+    {
+        "id":  "SYS-AZ",
+        "section":  "system",
+        "titleKey":  "tweak.SYS-AZ.title",
+        "descriptionKey":  "tweak.SYS-AZ.description",
+        "risk":  "high",
+        "requiresReboot":  false,
+        "actions":  [
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcu",
+                                        "path":  "Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings"
+                                    },
+                            "name":  "AutoConfigURL",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "https://antizapret.prostovpn.org/proxy.pac"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcu",
+                                        "path":  "Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings\\ZoneMap"
+                                    },
+                            "name":  "ProxyBypass",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  0
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcu",
+                                        "path":  "Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings\\Zones\\1"
+                                    },
+                            "name":  "Flags",
+                            "value":  {
+                                          "kind":  "dword",
+                                          "data":  211
+                                      }
+                        }
+                    ]
+    }
+]

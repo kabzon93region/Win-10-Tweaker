@@ -265,6 +265,11 @@ impl FakeServiceControl {
     pub fn add(&self, name: &str, state: ServiceState) {
         self.services.borrow_mut().insert(name.to_owned(), state);
     }
+
+    /// Removes a service, as if it was uninstalled.
+    pub fn remove(&self, name: &str) {
+        self.services.borrow_mut().remove(name);
+    }
 }
 
 impl IServiceControl for FakeServiceControl {

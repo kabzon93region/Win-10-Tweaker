@@ -7,7 +7,9 @@
 
 use std::io;
 
-use windows::Win32::Foundation::{CloseHandle, ERROR_ALREADY_EXISTS, GetLastError, HANDLE};
+use windows::Win32::Foundation::{
+    CloseHandle, ERROR_ALREADY_EXISTS, GetLastError, HANDLE, SetLastError, WIN32_ERROR,
+};
 use windows::Win32::System::Threading::CreateMutexW;
 use windows::core::HSTRING;
 
@@ -21,6 +23,9 @@ impl SingleInstance {
     /// Takes the mutex; `Ok(None)` means another process already holds it.
     pub fn acquire(name: &str) -> io::Result<Option<Self>> {
         let wide = HSTRING::from(name);
+        // CreateMutexW does not clear the last error on success, and a stale
+        // ERROR_ALREADY_EXISTS would make a fresh mutex look occupied.
+        unsafe { SetLastError(WIN32_ERROR(0)) };
         let handle = unsafe { CreateMutexW(None, false, &wide) }
             .map_err(|error| io::Error::other(error.to_string()))?;
         if unsafe { GetLastError() } == ERROR_ALREADY_EXISTS {

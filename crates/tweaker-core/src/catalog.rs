@@ -12,6 +12,7 @@ use crate::model::{DefinitionError, TweakDefinition};
 const PRIVACY_JSON: &str = include_str!("../data/tweaks/privacy.json");
 const SERVICES_JSON: &str = include_str!("../data/tweaks/services.json");
 const UI_JSON: &str = include_str!("../data/tweaks/ui.json");
+const SYSTEM_JSON: &str = include_str!("../data/tweaks/system.json");
 
 /// Problems found while loading the embedded catalog.
 #[derive(Debug)]
@@ -68,6 +69,11 @@ pub fn load_ui() -> Result<Vec<TweakDefinition>, CatalogError> {
     load(UI_JSON, "ui")
 }
 
+/// Loads the system section of the catalog.
+pub fn load_system() -> Result<Vec<TweakDefinition>, CatalogError> {
+    load(SYSTEM_JSON, "system")
+}
+
 /// Loads a catalog section by its id.
 ///
 /// `Ok(None)` means the section is not a catalog (a tool screen) or its data has
@@ -77,6 +83,7 @@ pub fn load_section(section: &str) -> Result<Option<Vec<TweakDefinition>>, Catal
         "privacy" => load_privacy().map(Some),
         "services" => load_services().map(Some),
         "ui" => load_ui().map(Some),
+        "system" => load_system().map(Some),
         _ => Ok(None),
     }
 }
@@ -307,8 +314,32 @@ mod tests {
         assert!(load_section("privacy").expect("privacy").is_some());
         assert!(load_section("services").expect("services").is_some());
         assert!(load_section("ui").expect("ui").is_some());
-        assert!(load_section("system").expect("system").is_none());
+        assert!(load_section("system").expect("system").is_some());
         assert!(load_section("sysinfo").expect("sysinfo").is_none());
+    }
+
+    #[test]
+    fn system_catalog_loads_with_known_ids() {
+        let tweaks = load_system().expect("catalog must load");
+        let ids: Vec<&str> = tweaks.iter().map(|tweak| tweak.id.as_str()).collect();
+        assert_eq!(ids.len(), 18);
+        assert_eq!(ids.first(), Some(&"SYS-01"));
+        assert_eq!(ids.last(), Some(&"SYS-AZ"));
+        for tweak in &tweaks {
+            assert!(!tweak.actions.is_empty(), "{} has no actions", tweak.id);
+            assert_eq!(tweak.section, "system");
+        }
+    }
+
+    #[test]
+    fn system_critical_items_match_the_feature_list() {
+        let tweaks = load_system().expect("catalog");
+        let critical: Vec<&str> = tweaks
+            .iter()
+            .filter(|tweak| tweak.risk == RiskLevel::Critical)
+            .map(|tweak| tweak.id.as_str())
+            .collect();
+        assert_eq!(critical, ["SYS-03", "SYS-04", "SYS-17"]);
     }
 
     #[test]

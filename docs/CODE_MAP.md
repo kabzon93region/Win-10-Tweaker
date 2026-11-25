@@ -3,7 +3,7 @@
 Навигация по текущему коду. Источник истины — исходники; карта обновляется на каждом этапе,
 где меняются публичные типы, интерфейсы или поток данных.
 
-Актуально для этапа 5, часть 2 (разделы `privacy`, `services`, `ui`).
+Актуально для этапа 5, часть 3 (разделы `privacy`, `services`, `ui`, `system`).
 
 ## Crates
 
@@ -17,8 +17,8 @@
 
 | Файл | Публичные элементы | Роль |
 |---|---|---|
-| `src/action.rs` | `RegistryRoot`, `RegistryKey`, `RegistryValue`, `ServiceStartMode`, `Action` (включая `HostsBlock`, `TaskSetEnabled`, `TaskSetEnabledMatching`, `RegistryDeleteKey`, `FileWriteBytes`), `render_hosts_block`/`strip_hosts_block`/`hosts_block_applied` | Декларативные действия; `Action::describe()` — предпросмотр, `is_reversible()` |
-| `src/catalog.rs` | `CatalogError`, `load_privacy`, `load_services`, `load_ui`, `load_section` | Embedded-каталоги `data/tweaks/{privacy,services,ui}.json`; `load_section` возвращает `None` для инструментов и ещё не заполненных разделов |
+| `src/action.rs` | `RegistryRoot`, `RegistryKey`, `RegistryValue`, `ServiceStartMode`, `Action` (включая `HostsBlock`, `TaskSetEnabled`, `TaskSetEnabledMatching`, `RegistryDeleteKey`, `FileWriteBytes`, `ProcessRunReversible`), `render_hosts_block`/`strip_hosts_block`/`hosts_block_applied` | Декларативные действия; `Action::describe()` — предпросмотр, `is_reversible()` |
+| `src/catalog.rs` | `CatalogError`, `load_privacy`, `load_services`, `load_ui`, `load_system`, `load_section` | Embedded-каталоги `data/tweaks/{privacy,services,ui,system}.json`; `load_section` возвращает `None` для инструментов и ещё не заполненных разделов |
 | `src/adapters.rs` | трейты `IRegistry`, `IFileSystem`, `IServiceControl`, `IProcessRunner`, `IFirewall`, `IScheduler`, `IAppx`, `ISystemInfo`; `AdapterError`, `ServiceState`, `ServiceStatus`, `TaskInfo`, `RegistryTree`, `ProcessOutput`, `OsVersion`, `FirewallRule`, `FirewallDirection` | Единственный мост к системе; `IRegistry::read_tree`/`delete_tree` — снимок и удаление ключа с поддеревом; `IFileSystem::read_bytes`/`write_bytes` — бинарные файлы |
 | `src/model.rs` | `RiskLevel`, `TweakDefinition`, `DefinitionError`, `TweakState`, `PlanStep`, `Plan` | Пункт каталога как данные; валидация id/ключей |
 | `src/journal.rs` | `Snapshot` (значение, дерево ключа, текст, бинарный файл, служба, задачи), `Phase`, `JournalRecord`, `AppliedOp`, `Journal` | JSONL-журнал: две фазы, ротация, чтение, поиск неоткаченных и незавершённых операций |
@@ -63,6 +63,7 @@
 | `crates/tweaker-core/tests/privacy_section.rs` | 17 тестов по пунктам `privacy` + обратимость, недоступность без служб, ошибки записи hosts и реестра |
 | `crates/tweaker-core/tests/services_section.rs` | 24 теста по пунктам `services` + недоступность без службы + восстановление режима запуска |
 | `crates/tweaker-core/tests/ui_section.rs` | 17 тестов по пунктам `ui` + проверка обратимости действий |
+| `crates/tweaker-core/tests/system_section.rs` | 18 тестов по пунктам `system` + аргументы команд, недоступность SYS-03/07, обратимость |
 | `crates/*/src/**` (`#[cfg(test)]`) | Юнит-тесты движка, журнала, логгера, каталога, модели, адаптеров Windows, локализации, CLI-режимов |
 
 ## Поток данных
@@ -92,7 +93,7 @@ TweakDefinition (данные каталога, этап 3)
 
 ## Известные пробелы (на этапе 5, часть 2)
 
-- Каталог: `privacy` 17/17, `services` 24/24, `ui` 17/17; `system`, `context`, `apps`, `autorun` ещё показывают заглушку.
+- Каталог: `privacy` 17/17, `services` 24/24, `ui` 17/17, `system` 18/18; `context`, `apps`, `autorun` ещё показывают заглушку.
 - UI-02/12/13 — документированная часть требований (подмена шрифтов, 8 значений, классическое меню), см. D-25.
 - Применение выполняется в UI-потоке: прогресса и отмены нет (дефект D-2 из `TEST_REPORT.md`, этап 6).
 - Незавершённая операция не предлагается к откату при старте (D-8, этап 6).
@@ -114,6 +115,7 @@ cargo test --workspace
 cargo test -p tweaker-core --test privacy_section
 cargo test -p tweaker-core --test services_section
 cargo test -p tweaker-core --test ui_section
+cargo test -p tweaker-core --test system_section
 cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all -- --check
 ```

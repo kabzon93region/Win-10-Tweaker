@@ -9,6 +9,7 @@ use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use tweaker_core::action::{Action, ServiceStartMode};
+use tweaker_core::adapters::ProcessOutput;
 use tweaker_core::adapters::{ServiceState, ServiceStatus};
 use tweaker_core::catalog;
 use tweaker_core::engine::Engine;
@@ -110,6 +111,11 @@ pub fn seed(harness: &Harness, tweaks: &[TweakDefinition]) {
                     );
                 }
                 Action::TaskSetEnabled { path, .. } => harness.scheduler.add(path, true),
+                Action::RegistryDelete { key, name } => {
+                    harness
+                        .registry
+                        .set(key, name, tweaker_core::action::RegistryValue::Dword(1))
+                }
                 Action::RegistryDeleteKey { key } => {
                     harness
                         .registry
@@ -119,10 +125,14 @@ pub fn seed(harness: &Harness, tweaks: &[TweakDefinition]) {
                     folder, prefixes, ..
                 } => {
                     let folder = folder.trim_end_matches('\\');
-                    for prefix in prefixes {
-                        harness
-                            .scheduler
-                            .add(&format!("{folder}\\{prefix}_Test"), true);
+                    if prefixes.is_empty() {
+                        harness.scheduler.add(&format!("{folder}\\TestTask"), true);
+                    } else {
+                        for prefix in prefixes {
+                            harness
+                                .scheduler
+                                .add(&format!("{folder}\\{prefix}_Test"), true);
+                        }
                     }
                 }
                 Action::HostsBlock { path, .. } => {
@@ -142,6 +152,11 @@ pub fn check_item(section_id: &str, id: &str) {
     seed(&harness, &section(section_id));
     let tweak = item(section_id, id);
     let engine = harness.engine();
+    *harness.processes.output.borrow_mut() = ProcessOutput {
+        code: Some(0),
+        stdout: String::new(),
+        stderr: String::new(),
+    };
 
     assert_eq!(
         engine.detect(&tweak),
@@ -154,10 +169,8 @@ pub fn check_item(section_id: &str, id: &str) {
     assert!(plan.skipped.is_empty(), "{id}: nothing is applied yet");
     for step in &plan.steps {
         match (&step.action, &step.before) {
-            (
-                Action::RegistrySet { .. } | Action::RegistryDelete { .. },
-                Snapshot::Registry(None),
-            ) => {}
+            (Action::RegistrySet { .. }, Snapshot::Registry(None)) => {}
+            (Action::RegistryDelete { .. }, Snapshot::Registry(Some(_))) => {}
             (Action::RegistryDeleteKey { .. }, Snapshot::RegistryKey(Some(tree))) => {
                 assert!(
                     !tree.values.is_empty(),
@@ -194,6 +207,7 @@ pub fn check_item(section_id: &str, id: &str) {
             }
             (Action::FileWrite { .. } | Action::FileDelete { .. }, Snapshot::TextFile(_)) => {}
             (Action::FileWriteBytes { .. }, Snapshot::BinaryFile(None)) => {}
+            (Action::ProcessRun { .. } | Action::ProcessRunReversible { .. }, Snapshot::None) => {}
             other => panic!("{id}: unexpected state before the action: {other:?}"),
         }
     }
