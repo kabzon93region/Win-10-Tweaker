@@ -9,7 +9,7 @@
 | Этап | 2 — движок apply/detect/revert (завершён); следующий — 3 (раздел `privacy`) |
 | Код | `Cargo.toml`, `crates/tweaker-core`, `crates/tweaker-windows`, `crates/tweaker-app` |
 | Версия | 0.1.0 |
-| Git | `88de898f806ff53ebcdd7e1d8b26cfc9097ed8e4` (этап 1) |
+| Git | `1e05d147930d317699e07ec81e1673a59bb6aaf2` (этап 2; этап 1 — `88de898`) |
 | Сборка | `cargo build --workspace` — успешно; `cargo build --release -p tweaker-app` — успешно (чистая сборка 1 мин 11 с, повторная 20 с) |
 | Артефакт | `target/release/wintweaker.exe` — 6 187 008 байт, sha256 `3BFAF49DD50E9577C849AB4CE6E20C2FDF77D0B92D3AD0264A387F26536F919A` |
 | Тесты | `cargo test --workspace` — 92 passed, 1 ignored (запись в HKCU вне песочницы) |
