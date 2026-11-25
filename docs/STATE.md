@@ -9,7 +9,7 @@
 | Этап | 3 — раздел `privacy`: 17 из 17 пунктов (реестр, файлы, hosts, службы, задачи планировщика) |
 | Код | `Cargo.toml`, `crates/tweaker-core`, `crates/tweaker-windows`, `crates/tweaker-app` |
 | Версия | 0.1.0 |
-| Git | `af4531e` (этап 3, часть 1; этап 3 решения — `061b853`, этап 2 — `1e05d14`, этап 1 — `88de898`); часть 2 — коммит после аудита |
+| Git | `e1237a8` (этап 3 целиком; часть 1 — `af4531e`, решения — `061b853`, этап 2 — `1e05d14`, этап 1 — `88de898`) |
 | Сборка | `cargo build --workspace` — успешно; `cargo build --release -p tweaker-app` — успешно (28,5 с) |
 | Артефакт | `target/release/wintweaker.exe` — 6 735 360 байт, sha256 `9728675A9C833CF7251A01874318709095D56421AAD4FDCD566B3161809FD6F8` |
 | Тесты | `cargo test --workspace` — 120 passed, 1 ignored (app 17, core 82, windows 21) |
