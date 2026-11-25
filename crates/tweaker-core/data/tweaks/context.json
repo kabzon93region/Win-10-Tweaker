@@ -1,0 +1,997 @@
+[
+    {
+        "id":  "CTX-01",
+        "section":  "context",
+        "titleKey":  "tweak.CTX-01.title",
+        "descriptionKey":  "tweak.CTX-01.description",
+        "risk":  "low",
+        "requiresReboot":  false,
+        "actions":  [
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "*\\shell\\WinTweakerTakeOwn"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "Стать владельцем и получить полный доступ"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "*\\shell\\WinTweakerTakeOwn\\command"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "cmd.exe /c takeown /f \"%1\" /r /d y \u0026 icacls \"%1\" /grant *S-1-5-32-544:F /t"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "Directory\\shell\\WinTweakerTakeOwn"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "Стать владельцем и получить полный доступ"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "Directory\\shell\\WinTweakerTakeOwn\\command"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "cmd.exe /c takeown /f \"%1\" /r /d y \u0026 icacls \"%1\" /grant *S-1-5-32-544:F /t"
+                                      }
+                        }
+                    ]
+    },
+    {
+        "id":  "CTX-02",
+        "section":  "context",
+        "titleKey":  "tweak.CTX-02.title",
+        "descriptionKey":  "tweak.CTX-02.description",
+        "risk":  "medium",
+        "requiresReboot":  false,
+        "actions":  [
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "CLSID\\{20D04FE0-3AEA-1069-A2D8-08002B30309D}\\shell\\WinTweakerAdmin"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "Администрирование"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "CLSID\\{20D04FE0-3AEA-1069-A2D8-08002B30309D}\\shell\\WinTweakerAdmin\\command"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "control.exe admintools"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "CLSID\\{20D04FE0-3AEA-1069-A2D8-08002B30309D}\\shell\\WinTweakerDeviceManager"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "Диспетчер устройств"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "CLSID\\{20D04FE0-3AEA-1069-A2D8-08002B30309D}\\shell\\WinTweakerDeviceManager\\command"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "devmgmt.msc"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "CLSID\\{20D04FE0-3AEA-1069-A2D8-08002B30309D}\\shell\\WinTweakerServices"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "Службы"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "CLSID\\{20D04FE0-3AEA-1069-A2D8-08002B30309D}\\shell\\WinTweakerServices\\command"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "services.msc"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "CLSID\\{20D04FE0-3AEA-1069-A2D8-08002B30309D}\\shell\\WinTweakerRegedit"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "Редактор реестра"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "CLSID\\{20D04FE0-3AEA-1069-A2D8-08002B30309D}\\shell\\WinTweakerRegedit\\command"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "regedit.exe"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "CLSID\\{20D04FE0-3AEA-1069-A2D8-08002B30309D}\\shell\\WinTweakerRestart"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "Перезагрузка"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "CLSID\\{20D04FE0-3AEA-1069-A2D8-08002B30309D}\\shell\\WinTweakerRestart\\command"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "shutdown.exe /r /t 0"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "CLSID\\{20D04FE0-3AEA-1069-A2D8-08002B30309D}\\shell\\WinTweakerShutdown"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "Выключение"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "CLSID\\{20D04FE0-3AEA-1069-A2D8-08002B30309D}\\shell\\WinTweakerShutdown\\command"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "shutdown.exe /s /t 0"
+                                      }
+                        }
+                    ]
+    },
+    {
+        "id":  "CTX-03",
+        "section":  "context",
+        "titleKey":  "tweak.CTX-03.title",
+        "descriptionKey":  "tweak.CTX-03.description",
+        "risk":  "low",
+        "requiresReboot":  false,
+        "actions":  [
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "DesktopBackground\\Shell\\WinTweakerCmd"
+                                    },
+                            "name":  "MUIVerb",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "Командная строка"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "DesktopBackground\\Shell\\WinTweakerCmd"
+                                    },
+                            "name":  "Icon",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "%SystemRoot%\\System32\\cmd.exe"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "DesktopBackground\\Shell\\WinTweakerCmd\\command"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "%SystemRoot%\\System32\\cmd.exe /s /k pushd \"%V\""
+                                      }
+                        }
+                    ]
+    },
+    {
+        "id":  "CTX-04",
+        "section":  "context",
+        "titleKey":  "tweak.CTX-04.title",
+        "descriptionKey":  "tweak.CTX-04.description",
+        "risk":  "low",
+        "requiresReboot":  false,
+        "actions":  [
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  ".cmd\\ShellNew"
+                                    },
+                            "name":  "NullFile",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  ""
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  ".reg\\ShellNew"
+                                    },
+                            "name":  "NullFile",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  ""
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  ".vbs\\ShellNew"
+                                    },
+                            "name":  "NullFile",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  ""
+                                      }
+                        }
+                    ]
+    },
+    {
+        "id":  "CTX-05",
+        "section":  "context",
+        "titleKey":  "tweak.CTX-05.title",
+        "descriptionKey":  "tweak.CTX-05.description",
+        "risk":  "medium",
+        "requiresReboot":  false,
+        "actions":  [
+                        {
+                            "kind":  "file_write",
+                            "path":  "C:\\Windows\\WinTweaker\\toggle-hidden.ps1",
+                            "content":  "$k=\u0027HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\u0027; $v=(Get-ItemProperty -Path $k).Hidden; if ($v -eq 2) { Set-ItemProperty -Path $k -Name Hidden -Value 1; Set-ItemProperty -Path $k -Name ShowSuperHidden -Value 0 } else { Set-ItemProperty -Path $k -Name Hidden -Value 2; Set-ItemProperty -Path $k -Name ShowSuperHidden -Value 1 }"
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "DesktopBackground\\Shell\\WinTweakerHidden"
+                                    },
+                            "name":  "MUIVerb",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "Показать/Скрыть системные папки"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "DesktopBackground\\Shell\\WinTweakerHidden\\command"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\\Windows\\WinTweaker\\toggle-hidden.ps1\""
+                                      }
+                        }
+                    ]
+    },
+    {
+        "id":  "CTX-06",
+        "section":  "context",
+        "titleKey":  "tweak.CTX-06.title",
+        "descriptionKey":  "tweak.CTX-06.description",
+        "risk":  "low",
+        "requiresReboot":  false,
+        "actions":  [
+                        {
+                            "kind":  "file_write",
+                            "path":  "C:\\Windows\\WinTweaker\\copy-image.ps1",
+                            "content":  "Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing; $i=[System.Drawing.Image]::FromFile($args[0]); [System.Windows.Forms.Clipboard]::SetImage($i); $i.Dispose()"
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "SystemFileAssociations\\image\\shell\\WinTweakerCopyImage"
+                                    },
+                            "name":  "MUIVerb",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "Копировать изображение в буфер"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "SystemFileAssociations\\image\\shell\\WinTweakerCopyImage\\command"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\\Windows\\WinTweaker\\copy-image.ps1\" \"%1\""
+                                      }
+                        }
+                    ]
+    },
+    {
+        "id":  "CTX-09",
+        "section":  "context",
+        "titleKey":  "tweak.CTX-09.title",
+        "descriptionKey":  "tweak.CTX-09.description",
+        "risk":  "high",
+        "requiresReboot":  false,
+        "actions":  [
+                        {
+                            "kind":  "file_write",
+                            "path":  "C:\\Windows\\WinTweaker\\block-internet.ps1",
+                            "content":  "$path=$args[0]; $name=\u0027WinTweaker Block \u0027+(Split-Path -Leaf $path); netsh.exe advfirewall firewall add rule name=\"$name\" dir=out program=\"$path\" action=block | Out-Null; netsh.exe advfirewall firewall add rule name=\"$name\" dir=in program=\"$path\" action=block | Out-Null"
+                        },
+                        {
+                            "kind":  "file_write",
+                            "path":  "C:\\Windows\\WinTweaker\\unblock-internet.ps1",
+                            "content":  "$path=$args[0]; $name=\u0027WinTweaker Block \u0027+(Split-Path -Leaf $path); netsh.exe advfirewall firewall delete rule name=\"$name\" dir=out | Out-Null; netsh.exe advfirewall firewall delete rule name=\"$name\" dir=in | Out-Null"
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "exefile\\shell\\WinTweakerBlockInternet"
+                                    },
+                            "name":  "MUIVerb",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "Запретить доступ в интернет"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "exefile\\shell\\WinTweakerBlockInternet\\command"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\\Windows\\WinTweaker\\block-internet.ps1\" \"%1\""
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "exefile\\shell\\WinTweakerUnblockInternet"
+                                    },
+                            "name":  "MUIVerb",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "Разрешить доступ в интернет"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "exefile\\shell\\WinTweakerUnblockInternet\\command"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\\Windows\\WinTweaker\\unblock-internet.ps1\" \"%1\""
+                                      }
+                        }
+                    ]
+    },
+    {
+        "id":  "CTX-10",
+        "section":  "context",
+        "titleKey":  "tweak.CTX-10.title",
+        "descriptionKey":  "tweak.CTX-10.description",
+        "risk":  "critical",
+        "requiresReboot":  false,
+        "actions":  [
+                        {
+                            "kind":  "file_write",
+                            "path":  "C:\\Windows\\WinTweaker\\empty-folder.ps1",
+                            "content":  "Add-Type -AssemblyName System.Windows.Forms; if ([System.Windows.Forms.MessageBox]::Show(\"Удалить содержимое папки? Это необратимо.\", \"WinTweaker\", 4) -eq 6) { Get-ChildItem -LiteralPath $args[0] -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue }"
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "Directory\\shell\\WinTweakerEmptyFolder"
+                                    },
+                            "name":  "MUIVerb",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "Удалить содержимое папки"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "Directory\\shell\\WinTweakerEmptyFolder\\command"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\\Windows\\WinTweaker\\empty-folder.ps1\" \"%1\""
+                                      }
+                        }
+                    ]
+    },
+    {
+        "id":  "CTX-11",
+        "section":  "context",
+        "titleKey":  "tweak.CTX-11.title",
+        "descriptionKey":  "tweak.CTX-11.description",
+        "risk":  "low",
+        "requiresReboot":  false,
+        "actions":  [
+                        {
+                            "kind":  "file_write",
+                            "path":  "C:\\Windows\\WinTweaker\\create-link.ps1",
+                            "content":  "$path=$args[0]; $name=Split-Path -Leaf $path; if ([IO.Directory]::Exists($path)) { cmd.exe /c mklink /D \"$env:USERPROFILE\\Desktop\\$name\" \"$path\" } else { cmd.exe /c mklink \"$env:USERPROFILE\\Desktop\\$name\" \"$path\" }"
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "*\\shell\\WinTweakerSymlink"
+                                    },
+                            "name":  "MUIVerb",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "Создать символическую ссылку на рабочем столе"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "*\\shell\\WinTweakerSymlink\\command"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\\Windows\\WinTweaker\\create-link.ps1\" \"%1\""
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "Directory\\shell\\WinTweakerSymlink"
+                                    },
+                            "name":  "MUIVerb",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "Создать символическую ссылку на рабочем столе"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "Directory\\shell\\WinTweakerSymlink\\command"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\\Windows\\WinTweaker\\create-link.ps1\" \"%1\""
+                                      }
+                        }
+                    ]
+    },
+    {
+        "id":  "CTX-12",
+        "section":  "context",
+        "titleKey":  "tweak.CTX-12.title",
+        "descriptionKey":  "tweak.CTX-12.description",
+        "risk":  "low",
+        "requiresReboot":  false,
+        "actions":  [
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "MSInfoFile\\shell\\open\\command"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "notepad.exe \"%1\""
+                                      }
+                        }
+                    ]
+    },
+    {
+        "id":  "CTX-13",
+        "section":  "context",
+        "titleKey":  "tweak.CTX-13.title",
+        "descriptionKey":  "tweak.CTX-13.description",
+        "risk":  "medium",
+        "requiresReboot":  false,
+        "actions":  [
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "SystemFileAssociations\\audio\\shell\\Enqueue"
+                                    },
+                            "name":  "LegacyDisable",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  ""
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "SystemFileAssociations\\audio\\shell\\Play"
+                                    },
+                            "name":  "LegacyDisable",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  ""
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "Directory\\shell\\Enqueue"
+                                    },
+                            "name":  "LegacyDisable",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  ""
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "Directory\\shell\\Play"
+                                    },
+                            "name":  "LegacyDisable",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  ""
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "SystemFileAssociations\\video\\shell\\Enqueue"
+                                    },
+                            "name":  "LegacyDisable",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  ""
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "SystemFileAssociations\\video\\shell\\Play"
+                                    },
+                            "name":  "LegacyDisable",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  ""
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "WMP11.AssocFile.MP3\\shell\\Enqueue"
+                                    },
+                            "name":  "LegacyDisable",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  ""
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "WMP11.AssocFile.MP3\\shell\\Play"
+                                    },
+                            "name":  "LegacyDisable",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  ""
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "WMP11.AssocFile.WMA\\shell\\Enqueue"
+                                    },
+                            "name":  "LegacyDisable",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  ""
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "WMP11.AssocFile.WMA\\shell\\Play"
+                                    },
+                            "name":  "LegacyDisable",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  ""
+                                      }
+                        }
+                    ]
+    },
+    {
+        "id":  "CTX-14",
+        "section":  "context",
+        "titleKey":  "tweak.CTX-14.title",
+        "descriptionKey":  "tweak.CTX-14.description",
+        "risk":  "low",
+        "requiresReboot":  false,
+        "actions":  [
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcu",
+                                        "path":  "Control Panel\\Desktop"
+                                    },
+                            "name":  "MenuShowDelay",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "20"
+                                      }
+                        }
+                    ]
+    },
+    {
+        "id":  "CTX-15",
+        "section":  "context",
+        "titleKey":  "tweak.CTX-15.title",
+        "descriptionKey":  "tweak.CTX-15.description",
+        "risk":  "medium",
+        "requiresReboot":  false,
+        "actions":  [
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "*\\shell\\Windows.ModernShare"
+                                    },
+                            "name":  "LegacyDisable",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  ""
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "*\\shellex\\ContextMenuHandlers\\Sharing"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  ""
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "AllFilesystemObjects\\shellex\\ContextMenuHandlers\\PreviousVersions"
+                                    },
+                            "name":  "LegacyDisable",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  ""
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "Directory\\shell\\pintohome"
+                                    },
+                            "name":  "LegacyDisable",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  ""
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "SystemFileAssociations\\image\\shell\\3DEdit"
+                                    },
+                            "name":  "LegacyDisable",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  ""
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "SystemFileAssociations\\image\\shell\\3DPrint"
+                                    },
+                            "name":  "LegacyDisable",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  ""
+                                      }
+                        }
+                    ]
+    },
+    {
+        "id":  "CTX-16",
+        "section":  "context",
+        "titleKey":  "tweak.CTX-16.title",
+        "descriptionKey":  "tweak.CTX-16.description",
+        "risk":  "low",
+        "requiresReboot":  false,
+        "actions":  [
+                        {
+                            "kind":  "registry_delete_key",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  ".bmp\\ShellNew"
+                                    }
+                        },
+                        {
+                            "kind":  "registry_delete_key",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  ".contact\\ShellNew"
+                                    }
+                        },
+                        {
+                            "kind":  "registry_delete_key",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  ".rtf\\ShellNew"
+                                    }
+                        },
+                        {
+                            "kind":  "registry_delete_key",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  ".zip\\ShellNew"
+                                    }
+                        },
+                        {
+                            "kind":  "registry_delete_key",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "Briefcase\\ShellNew"
+                                    }
+                        }
+                    ]
+    },
+    {
+        "id":  "CTX-17",
+        "section":  "context",
+        "titleKey":  "tweak.CTX-17.title",
+        "descriptionKey":  "tweak.CTX-17.description",
+        "risk":  "low",
+        "requiresReboot":  false,
+        "actions":  [
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "DesktopBackground\\Shell\\WinTweakerPersonalize"
+                                    },
+                            "name":  "MUIVerb",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "Персонализация"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "DesktopBackground\\Shell\\WinTweakerPersonalize\\shell\\Settings"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "Параметры персонализации"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "DesktopBackground\\Shell\\WinTweakerPersonalize\\shell\\Settings\\command"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "ms-settings:personalization"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "DesktopBackground\\Shell\\WinTweakerPersonalize\\shell\\Display"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "Экран"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "DesktopBackground\\Shell\\WinTweakerPersonalize\\shell\\Display\\command"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "control.exe desk.cpl"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "DesktopBackground\\Shell\\WinTweakerPersonalize\\shell\\SignOut"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "Выход"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "DesktopBackground\\Shell\\WinTweakerPersonalize\\shell\\SignOut\\command"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "shutdown.exe /l"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "DesktopBackground\\Shell\\WinTweakerPersonalize\\shell\\Restart"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "Перезагрузка"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "DesktopBackground\\Shell\\WinTweakerPersonalize\\shell\\Restart\\command"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "shutdown.exe /r /t 0"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "DesktopBackground\\Shell\\WinTweakerPersonalize\\shell\\Shutdown"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "Выключение"
+                                      }
+                        },
+                        {
+                            "kind":  "registry_set",
+                            "key":  {
+                                        "root":  "hkcr",
+                                        "path":  "DesktopBackground\\Shell\\WinTweakerPersonalize\\shell\\Shutdown\\command"
+                                    },
+                            "name":  "",
+                            "value":  {
+                                          "kind":  "string",
+                                          "data":  "shutdown.exe /s /t 0"
+                                      }
+                        }
+                    ]
+    }
+]
