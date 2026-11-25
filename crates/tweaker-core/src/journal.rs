@@ -15,7 +15,7 @@ use chrono::{SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::action::{Action, RegistryValue};
-use crate::adapters::ServiceState;
+use crate::adapters::{ServiceState, TaskInfo};
 use crate::logging;
 
 /// Name of the active journal file.
@@ -34,6 +34,8 @@ pub enum Snapshot {
     TextFile(Option<String>),
     /// Service state.
     Service(Option<ServiceState>),
+    /// Scheduled tasks and their enabled state.
+    Tasks(Vec<TaskInfo>),
     /// Nothing to restore (irreversible action).
     None,
 }

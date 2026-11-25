@@ -16,4 +16,5 @@ pub mod locale;
 pub mod os;
 pub mod process;
 pub mod registry;
+pub mod scheduler;
 pub mod services;

@@ -14,7 +14,8 @@ use crate::action::{
     strip_hosts_block,
 };
 use crate::adapters::{
-    IFileSystem, IProcessRunner, IRegistry, IServiceControl, ServiceState, ServiceStatus,
+    IFileSystem, IProcessRunner, IRegistry, IScheduler, IServiceControl, ServiceState,
+    ServiceStatus, TaskInfo,
 };
 use crate::journal::{Journal, Snapshot};
 use crate::model::{Plan, PlanStep, TweakDefinition, TweakState};
@@ -110,16 +111,19 @@ pub struct Engine<'a> {
     files: &'a dyn IFileSystem,
     services: &'a dyn IServiceControl,
     processes: &'a dyn IProcessRunner,
+    scheduler: &'a dyn IScheduler,
     journal: &'a Journal,
 }
 
 impl<'a> Engine<'a> {
     /// Wires the engine to its adapters.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         registry: &'a dyn IRegistry,
         files: &'a dyn IFileSystem,
         services: &'a dyn IServiceControl,
         processes: &'a dyn IProcessRunner,
+        scheduler: &'a dyn IScheduler,
         journal: &'a Journal,
     ) -> Self {
         Self {
@@ -127,6 +131,7 @@ impl<'a> Engine<'a> {
             files,
             services,
             processes,
+            scheduler,
             journal,
         }
     }
@@ -388,7 +393,62 @@ impl<'a> Engine<'a> {
                 let current = self.files.read_text(path).map_err(|error| error.message)?;
                 Ok(current.is_some_and(|text| hosts_block_applied(&text, domains)))
             }
+            Action::TaskSetEnabled { path, enabled } => {
+                match self
+                    .scheduler
+                    .is_enabled(path)
+                    .map_err(|error| error.message)?
+                {
+                    Some(state) => Ok(state == *enabled),
+                    None => Err(format!("task {path} was not found")),
+                }
+            }
+            Action::TaskSetEnabledMatching {
+                folder,
+                prefixes,
+                enabled,
+                optional,
+            } => {
+                let tasks = self.matching_tasks(folder, prefixes, *optional)?;
+                Ok(tasks.iter().all(|task| task.enabled == *enabled))
+            }
         }
+    }
+
+    fn matching_tasks(
+        &self,
+        folder: &str,
+        prefixes: &[String],
+        optional: bool,
+    ) -> Result<Vec<TaskInfo>, String> {
+        let paths = self.scheduler.list(folder).map_err(|error| error.message)?;
+        let matched: Vec<String> = paths
+            .into_iter()
+            .filter(|path| {
+                let name = path.rsplit('\\').next().unwrap_or_default();
+                prefixes.is_empty()
+                    || prefixes
+                        .iter()
+                        .any(|prefix| name.starts_with(prefix.as_str()))
+            })
+            .collect();
+        if matched.is_empty() {
+            if optional {
+                // Optional software is absent: nothing to do, not a failure.
+                return Ok(Vec::new());
+            }
+            return Err(format!("no scheduled tasks match {folder}"));
+        }
+        let mut tasks = Vec::with_capacity(matched.len());
+        for path in matched {
+            let enabled = self
+                .scheduler
+                .is_enabled(&path)
+                .map_err(|error| error.message)?
+                .ok_or_else(|| format!("task {path} disappeared"))?;
+            tasks.push(TaskInfo { path, enabled });
+        }
+        Ok(tasks)
     }
 
     fn snapshot(&self, action: &Action) -> Result<Snapshot, String> {
@@ -415,6 +475,27 @@ impl<'a> Engine<'a> {
                 let current = self.files.read_text(path).map_err(|error| error.message)?;
                 Ok(Snapshot::TextFile(current))
             }
+            Action::TaskSetEnabled { path, .. } => {
+                match self
+                    .scheduler
+                    .is_enabled(path)
+                    .map_err(|error| error.message)?
+                {
+                    Some(enabled) => Ok(Snapshot::Tasks(vec![TaskInfo {
+                        path: path.clone(),
+                        enabled,
+                    }])),
+                    None => Err(format!("task {path} was not found")),
+                }
+            }
+            Action::TaskSetEnabledMatching {
+                folder,
+                prefixes,
+                optional,
+                ..
+            } => Ok(Snapshot::Tasks(
+                self.matching_tasks(folder, prefixes, *optional)?,
+            )),
         }
     }
 
@@ -481,6 +562,24 @@ impl<'a> Engine<'a> {
                 self.files
                     .write_text(path, &content)
                     .map_err(|error| error.message)
+            }
+            Action::TaskSetEnabled { path, enabled } => self
+                .scheduler
+                .set_enabled(path, *enabled)
+                .map_err(|error| error.message),
+            Action::TaskSetEnabledMatching {
+                folder,
+                prefixes,
+                enabled,
+                optional,
+            } => {
+                let tasks = self.matching_tasks(folder, prefixes, *optional)?;
+                for task in tasks {
+                    self.scheduler
+                        .set_enabled(&task.path, *enabled)
+                        .map_err(|error| error.message)?;
+                }
+                Ok(())
             }
         }
     }
@@ -560,6 +659,30 @@ impl<'a> Engine<'a> {
                     ))
                 }
             }
+            Action::TaskSetEnabled { path, enabled } => {
+                match self
+                    .scheduler
+                    .is_enabled(path)
+                    .map_err(|error| error.message)?
+                {
+                    Some(state) if state == *enabled => Ok(()),
+                    Some(_) => Err(format!("task {path}: state was not changed")),
+                    None => Err(format!("task {path} was not found")),
+                }
+            }
+            Action::TaskSetEnabledMatching {
+                folder,
+                prefixes,
+                enabled,
+                optional,
+            } => {
+                let tasks = self.matching_tasks(folder, prefixes, *optional)?;
+                if tasks.iter().all(|task| task.enabled == *enabled) {
+                    Ok(())
+                } else {
+                    Err(format!("tasks in {folder}: not all tasks were changed"))
+                }
+            }
         }
     }
 
@@ -611,6 +734,18 @@ impl<'a> Engine<'a> {
                     )),
                 }
             }
+            (
+                Action::TaskSetEnabled { .. } | Action::TaskSetEnabledMatching { .. },
+                Snapshot::Tasks(previous),
+            ) => {
+                // An empty list means an optional action had nothing to change.
+                for task in previous {
+                    self.scheduler
+                        .set_enabled(&task.path, task.enabled)
+                        .map_err(|error| error.message)?;
+                }
+                Ok(())
+            }
             (Action::ProcessRun { .. }, _) => Err("this action cannot be reverted".to_owned()),
             _ => Err("journal snapshot does not match the action".to_owned()),
         }
@@ -661,6 +796,23 @@ impl<'a> Engine<'a> {
                     Err(format!("service {service} was not restored"))
                 }
             }
+            (
+                Action::TaskSetEnabled { .. } | Action::TaskSetEnabledMatching { .. },
+                Snapshot::Tasks(previous),
+            ) => {
+                for task in previous {
+                    match self
+                        .scheduler
+                        .is_enabled(&task.path)
+                        .map_err(|error| error.message)?
+                    {
+                        Some(state) if state == task.enabled => {}
+                        Some(_) => return Err(format!("task {} was not restored", task.path)),
+                        None => return Err(format!("task {} disappeared", task.path)),
+                    }
+                }
+                Ok(())
+            }
             (Action::ProcessRun { .. }, _) => Err("this action cannot be reverted".to_owned()),
             _ => Err("journal snapshot does not match the action".to_owned()),
         }
@@ -693,7 +845,9 @@ mod tests {
     use super::*;
     use crate::action::{RegistryKey, RegistryRoot};
     use crate::adapters::{AdapterError, IRegistry, ProcessOutput, ServiceState, ServiceStatus};
-    use crate::fake::{FakeFileSystem, FakeProcessRunner, FakeRegistry, FakeServiceControl};
+    use crate::fake::{
+        FakeFileSystem, FakeProcessRunner, FakeRegistry, FakeScheduler, FakeServiceControl,
+    };
     use crate::model::{RiskLevel, TweakDefinition};
     use crate::test_support::temp_dir;
     use std::path::PathBuf;
@@ -703,6 +857,7 @@ mod tests {
         files: FakeFileSystem,
         services: FakeServiceControl,
         processes: FakeProcessRunner,
+        scheduler: FakeScheduler,
         journal: Journal,
         dir: PathBuf,
     }
@@ -716,6 +871,7 @@ mod tests {
                 files: FakeFileSystem::default(),
                 services: FakeServiceControl::default(),
                 processes: FakeProcessRunner::default(),
+                scheduler: FakeScheduler::default(),
                 journal,
                 dir,
             }
@@ -727,6 +883,7 @@ mod tests {
                 &self.files,
                 &self.services,
                 &self.processes,
+                &self.scheduler,
                 &self.journal,
             )
         }
@@ -893,14 +1050,19 @@ mod tests {
         let files = FakeFileSystem::default();
         let services = FakeServiceControl::default();
         let processes = FakeProcessRunner::default();
+        let scheduler = FakeScheduler::default();
         let definition = tweak(vec![set_value(0)]);
         {
             let journal = Journal::new(&dir).expect("journal");
-            let engine = Engine::new(&registry, &files, &services, &processes, &journal);
+            let engine = Engine::new(
+                &registry, &files, &services, &processes, &scheduler, &journal,
+            );
             assert!(engine.apply_tweak(&definition).success());
         }
         let journal = Journal::new(&dir).expect("journal");
-        let engine = Engine::new(&registry, &files, &services, &processes, &journal);
+        let engine = Engine::new(
+            &registry, &files, &services, &processes, &scheduler, &journal,
+        );
         let revert = engine.revert("PRIV-01");
         assert!(revert.success(), "{revert:?}");
         assert_eq!(registry.get(&key(), "Value"), None);
@@ -1047,7 +1209,10 @@ mod tests {
         let files = FakeFileSystem::default();
         let services = FakeServiceControl::default();
         let processes = FakeProcessRunner::default();
-        let engine = Engine::new(&registry, &files, &services, &processes, &journal);
+        let scheduler = FakeScheduler::default();
+        let engine = Engine::new(
+            &registry, &files, &services, &processes, &scheduler, &journal,
+        );
         let plan = engine.plan(&tweak(vec![set_value(0)]));
         assert!(matches!(plan, Err(PlanError::Unavailable { .. })));
         let _ = std::fs::remove_dir_all(&dir);
@@ -1092,7 +1257,10 @@ mod tests {
         let files = FakeFileSystem::default();
         let services = FakeServiceControl::default();
         let processes = FakeProcessRunner::default();
-        let engine = Engine::new(&registry, &files, &services, &processes, &journal);
+        let scheduler = FakeScheduler::default();
+        let engine = Engine::new(
+            &registry, &files, &services, &processes, &scheduler, &journal,
+        );
         let plan = engine.plan(&tweak(vec![set_value(0)]));
         assert!(matches!(plan, Err(PlanError::Snapshot { .. })), "{plan:?}");
         assert_eq!(registry.reads.get(), 2);
@@ -1246,5 +1414,196 @@ mod tests {
         let text = harness.files.get(&path).expect("hosts file");
         assert!(text.contains("0.0.0.0 ads.example"));
         assert_eq!(text.matches(crate::action::HOSTS_BLOCK_START).count(), 1);
+    }
+
+    #[test]
+    fn scheduled_task_toggles_and_reverts() {
+        let harness = Harness::new("task");
+        let path = r"\Microsoft\Windows\Demo\Task".to_owned();
+        harness.scheduler.add(&path, true);
+        let engine = harness.engine();
+        let definition = tweak(vec![Action::TaskSetEnabled {
+            path: path.clone(),
+            enabled: false,
+        }]);
+        assert!(engine.apply_tweak(&definition).success());
+        assert_eq!(
+            harness.scheduler.is_enabled(&path).expect("state"),
+            Some(false)
+        );
+        assert_eq!(engine.detect(&definition), TweakState::Applied);
+        let revert = engine.revert("PRIV-01");
+        assert!(revert.success(), "{revert:?}");
+        assert_eq!(
+            harness.scheduler.is_enabled(&path).expect("state"),
+            Some(true)
+        );
+    }
+
+    #[test]
+    fn matching_tasks_toggle_only_the_named_prefixes() {
+        let harness = Harness::new("task-matching");
+        harness.scheduler.add(r"\Test\A1", true);
+        harness.scheduler.add(r"\Test\A2", true);
+        harness.scheduler.add(r"\Test\B1", true);
+        let engine = harness.engine();
+        let definition = tweak(vec![Action::TaskSetEnabledMatching {
+            folder: "\\Test".to_owned(),
+            prefixes: vec!["A".to_owned()],
+            enabled: false,
+            optional: false,
+        }]);
+        assert!(engine.apply_tweak(&definition).success());
+        assert_eq!(
+            harness.scheduler.is_enabled(r"\Test\A1").expect("state"),
+            Some(false)
+        );
+        assert_eq!(
+            harness.scheduler.is_enabled(r"\Test\A2").expect("state"),
+            Some(false)
+        );
+        assert_eq!(
+            harness.scheduler.is_enabled(r"\Test\B1").expect("state"),
+            Some(true)
+        );
+        let revert = engine.revert("PRIV-01");
+        assert!(revert.success(), "{revert:?}");
+        assert_eq!(
+            harness.scheduler.is_enabled(r"\Test\A1").expect("state"),
+            Some(true)
+        );
+        assert_eq!(
+            harness.scheduler.is_enabled(r"\Test\A2").expect("state"),
+            Some(true)
+        );
+    }
+
+    #[test]
+    fn matching_without_tasks_is_unavailable() {
+        let harness = Harness::new("task-none");
+        let engine = harness.engine();
+        let definition = tweak(vec![Action::TaskSetEnabledMatching {
+            folder: "\\Nope".to_owned(),
+            prefixes: vec!["X".to_owned()],
+            enabled: false,
+            optional: false,
+        }]);
+        assert!(matches!(
+            engine.detect(&definition),
+            TweakState::Unavailable { .. }
+        ));
+        assert!(matches!(
+            engine.plan(&definition),
+            Err(PlanError::Unavailable { .. })
+        ));
+    }
+
+    #[test]
+    fn optional_matching_without_tasks_is_satisfied() {
+        let harness = Harness::new("task-optional");
+        let engine = harness.engine();
+        let definition = tweak(vec![Action::TaskSetEnabledMatching {
+            folder: "\\Nope".to_owned(),
+            prefixes: vec!["X".to_owned()],
+            enabled: false,
+            optional: true,
+        }]);
+        assert_eq!(engine.detect(&definition), TweakState::Applied);
+        let plan = engine.plan(&definition).expect("plan");
+        assert!(plan.steps.is_empty(), "{plan:?}");
+        assert_eq!(plan.skipped.len(), 1);
+        let report = engine.apply_tweak(&definition);
+        assert!(report.success(), "{report:?}");
+        assert!(report.applied.is_empty(), "{report:?}");
+        let revert = engine.revert("PRIV-01");
+        assert!(revert.success(), "{revert:?}");
+    }
+
+    #[test]
+    fn privacy_five_disables_telemetry_tasks_and_is_idempotent() {
+        let harness = Harness::new("privacy-five");
+        let wanted = [
+            r"\Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser",
+            r"\Microsoft\Windows\Application Experience\ProgramDataUpdater",
+            r"\Microsoft\Windows\Application Experience\StartupAppTask",
+            r"\Microsoft\Windows\Application Experience\PcaPatchDbTask",
+            r"\Microsoft\Windows\Application Experience\PcaGeneralDb0",
+            r"\Microsoft\Windows\Application Experience\PcaGeneralDb1",
+            r"\Microsoft\Windows\Autochk\Proxy",
+            r"\Microsoft\Windows\Customer Experience Improvement Program\Consolidator",
+            r"\Microsoft\Windows\Customer Experience Improvement Program\UsbCeip",
+            r"\Microsoft\Windows\Customer Experience Improvement Program\KernelCeipTask",
+            r"\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticDataCollector",
+            r"\Microsoft\Windows\Feedback\Siuf\DmClient",
+            r"\Microsoft\Windows\NetTrace\GatherNetworkInfo",
+            r"\Microsoft\Windows\PI\Sqm-Tasks",
+            r"\Microsoft\Windows\Windows Error Reporting\QueueReporting",
+            r"\Microsoft\Windows\Maintenance\WinSAT",
+        ];
+        for path in wanted {
+            harness.scheduler.add(path, true);
+        }
+        let untouched = [
+            r"\Microsoft\Windows\Defrag\ScheduledDefrag",
+            r"\Microsoft\Office\OfficeTelemetryAgentLogOn",
+        ];
+        for path in untouched {
+            harness.scheduler.add(path, true);
+        }
+        let definition = crate::catalog::load_privacy()
+            .expect("catalog")
+            .into_iter()
+            .find(|tweak| tweak.id == "PRIV-05")
+            .expect("PRIV-05");
+        let engine = harness.engine();
+
+        let report = engine.apply_tweak(&definition);
+        assert!(report.success(), "{report:?}");
+        for path in wanted {
+            assert_eq!(
+                harness.scheduler.is_enabled(path).expect("state"),
+                Some(false),
+                "{path} must be disabled"
+            );
+        }
+        for path in untouched {
+            assert_eq!(
+                harness.scheduler.is_enabled(path).expect("state"),
+                Some(true),
+                "{path} must stay enabled"
+            );
+        }
+        assert_eq!(engine.detect(&definition), TweakState::Applied);
+
+        let again = engine.plan(&definition).expect("second plan");
+        assert!(again.steps.is_empty(), "{again:?}");
+        assert_eq!(again.skipped.len(), 1);
+        let report = engine.apply_tweak(&definition);
+        assert!(report.success(), "{report:?}");
+        assert!(report.applied.is_empty(), "{report:?}");
+
+        let revert = engine.revert("PRIV-05");
+        assert!(revert.success(), "{revert:?}");
+        for path in wanted {
+            assert_eq!(
+                harness.scheduler.is_enabled(path).expect("state"),
+                Some(true),
+                "{path} must be restored"
+            );
+        }
+    }
+
+    #[test]
+    fn missing_exact_task_is_unavailable() {
+        let harness = Harness::new("task-missing");
+        let engine = harness.engine();
+        let definition = tweak(vec![Action::TaskSetEnabled {
+            path: r"\Nope\Task".to_owned(),
+            enabled: false,
+        }]);
+        assert!(matches!(
+            engine.detect(&definition),
+            TweakState::Unavailable { .. }
+        ));
     }
 }

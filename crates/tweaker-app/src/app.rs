@@ -13,7 +13,7 @@ use tweaker_core::catalog;
 use tweaker_core::engine::Engine;
 use tweaker_core::journal::Journal;
 use tweaker_core::logging;
-use tweaker_core::model::{TweakDefinition, TweakState};
+use tweaker_core::model::{RiskLevel, TweakDefinition, TweakState};
 use tweaker_core::paths::ProductPaths;
 use tweaker_core::product::{PRODUCT_VERSION, version_string};
 use tweaker_core::sections::{Section, SectionKind};
@@ -21,6 +21,7 @@ use tweaker_windows::elevation::{self, ElevationResult};
 use tweaker_windows::files::WindowsFileSystem;
 use tweaker_windows::process::SystemProcessRunner;
 use tweaker_windows::registry::WindowsRegistry;
+use tweaker_windows::scheduler::WindowsScheduler;
 use tweaker_windows::services::WindowsServices;
 
 use crate::i18n::{self, Localizer};
@@ -240,6 +241,7 @@ struct TweakerApp {
     files: WindowsFileSystem,
     services: WindowsServices,
     processes: SystemProcessRunner,
+    scheduler: WindowsScheduler,
     journal: Option<Journal>,
     privacy: PrivacyView,
 }
@@ -332,6 +334,7 @@ impl TweakerApp {
             files: WindowsFileSystem,
             services: WindowsServices,
             processes: SystemProcessRunner,
+            scheduler: WindowsScheduler,
             journal,
             privacy: PrivacyView {
                 tweaks,
@@ -492,7 +495,6 @@ impl TweakerApp {
         let placeholder_body = self.loc.t("placeholder.body");
         let is_about = section.id == "about";
         let is_privacy = section.id == "privacy";
-        let declared_items = section.items;
         let about_lines = if is_about {
             self.about_lines()
         } else {
@@ -516,7 +518,7 @@ impl TweakerApp {
                     ui.separator();
                     ui.add_space(10.0);
                     if is_privacy {
-                        self.draw_privacy(ui, declared_items);
+                        self.draw_privacy(ui);
                     } else {
                         ui.label(egui::RichText::new(kind_text).size(13.0));
                         ui.add_space(14.0);
@@ -546,7 +548,7 @@ impl TweakerApp {
         });
     }
 
-    fn draw_privacy(&mut self, ui: &mut egui::Ui, declared_items: u32) {
+    fn draw_privacy(&mut self, ui: &mut egui::Ui) {
         if self.privacy.states.len() != self.privacy.tweaks.len() {
             self.refresh_privacy_states();
         }
@@ -561,10 +563,10 @@ impl TweakerApp {
             let (state_text, state_color) = privacy_state_text(loc, &state);
             let risk_text = loc.t(&format!("privacy.risk.{}", tweak.risk.label()));
             let risk_color = match tweak.risk {
-                tweaker_core::model::RiskLevel::Low => egui::Color32::from_rgb(21, 128, 61),
-                tweaker_core::model::RiskLevel::Medium => egui::Color32::from_gray(120),
-                tweaker_core::model::RiskLevel::High => egui::Color32::from_rgb(180, 83, 9),
-                tweaker_core::model::RiskLevel::Critical => egui::Color32::from_rgb(185, 28, 28),
+                RiskLevel::Low => egui::Color32::from_rgb(21, 128, 61),
+                RiskLevel::Medium => egui::Color32::from_gray(120),
+                RiskLevel::High => egui::Color32::from_rgb(180, 83, 9),
+                RiskLevel::Critical => egui::Color32::from_rgb(185, 28, 28),
             };
             rows.push(PrivacyRow {
                 title: loc.t(&tweak.title_key),
@@ -579,6 +581,14 @@ impl TweakerApp {
         let mut selected = self.privacy.selected.clone();
         let mut action: Option<PrivacyAction> = None;
         let selected_count = selected.iter().filter(|value| **value).count();
+        let risky_selected = self
+            .privacy
+            .tweaks
+            .iter()
+            .enumerate()
+            .any(|(index, tweak)| {
+                selected.get(index).copied().unwrap_or(false) && tweak.risk.requires_confirmation()
+            });
 
         ui.horizontal(|ui| {
             if ui.button(loc.t("privacy.reload")).clicked() {
@@ -594,19 +604,17 @@ impl TweakerApp {
                 "privacy.selected",
                 &[("count", &selected_count.to_string())],
             ));
+            ui.label(loc.fmt("privacy.items", &[("count", &rows.len().to_string())]));
         });
+        if risky_selected {
+            ui.label(
+                egui::RichText::new(loc.t("privacy.need_confirm"))
+                    .size(12.0)
+                    .color(egui::Color32::from_rgb(180, 83, 9)),
+            );
+        }
         ui.add_space(6.0);
-        ui.label(
-            egui::RichText::new(loc.fmt(
-                "privacy.partial",
-                &[
-                    ("done", &self.privacy.tweaks.len().to_string()),
-                    ("total", &declared_items.to_string()),
-                ],
-            ))
-            .size(11.0)
-            .color(egui::Color32::from_gray(120)),
-        );
+
         for (index, row) in rows.iter().enumerate() {
             ui.horizontal(|ui| {
                 if selected.len() > index {
@@ -648,6 +656,13 @@ impl TweakerApp {
                     ui.add_space(4.0);
                     for line in &self.privacy.preview {
                         ui.label(line);
+                    }
+                    if risky_selected {
+                        ui.label(
+                            egui::RichText::new(loc.t("privacy.need_confirm"))
+                                .size(12.0)
+                                .color(egui::Color32::from_rgb(180, 83, 9)),
+                        );
                     }
                     ui.add_space(6.0);
                     ui.horizontal(|ui| {
@@ -720,6 +735,7 @@ impl TweakerApp {
             &self.files,
             &self.services,
             &self.processes,
+            &self.scheduler,
             journal,
         );
         self.privacy
@@ -763,6 +779,7 @@ impl TweakerApp {
             &self.files,
             &self.services,
             &self.processes,
+            &self.scheduler,
             journal,
         );
         let mut lines = Vec::new();
@@ -813,6 +830,7 @@ impl TweakerApp {
             &self.files,
             &self.services,
             &self.processes,
+            &self.scheduler,
             journal,
         );
         let mut lines = Vec::new();
@@ -868,6 +886,7 @@ impl TweakerApp {
             &self.files,
             &self.services,
             &self.processes,
+            &self.scheduler,
             journal,
         );
         let mut lines = Vec::new();

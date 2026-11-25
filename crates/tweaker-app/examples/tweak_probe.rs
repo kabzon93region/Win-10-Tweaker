@@ -15,6 +15,7 @@ use tweaker_core::paths::ProductPaths;
 use tweaker_windows::files::WindowsFileSystem;
 use tweaker_windows::process::SystemProcessRunner;
 use tweaker_windows::registry::WindowsRegistry;
+use tweaker_windows::scheduler::WindowsScheduler;
 use tweaker_windows::services::WindowsServices;
 
 fn main() -> ExitCode {
@@ -44,7 +45,10 @@ fn run(id: &str, command: &str) -> Result<u8, String> {
     let files = WindowsFileSystem;
     let services = WindowsServices;
     let processes = SystemProcessRunner;
-    let engine = Engine::new(&registry, &files, &services, &processes, &journal);
+    let scheduler = WindowsScheduler;
+    let engine = Engine::new(
+        &registry, &files, &services, &processes, &scheduler, &journal,
+    );
 
     let tweaks = catalog::load_privacy().map_err(|error| error.to_string())?;
     let tweak = tweaks

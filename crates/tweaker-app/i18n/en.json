@@ -67,7 +67,6 @@
   "section.about": "About",
   "hint.about": "Version, license, feedback.",
   "privacy.items": "Items: {count}",
-  "privacy.partial": "{done} of {total} items of this section are implemented; the rest arrive in the next step.",
   "privacy.reload": "Refresh states",
   "privacy.apply": "Apply selected",
   "privacy.revert": "Revert selected",
@@ -112,5 +111,17 @@
   "tweak.PRIV-13.title": "Speech model updates",
   "tweak.PRIV-13.description": "Disables speech recognition model updates.",
   "tweak.PRIV-15.title": "Microsoft experiments",
-  "tweak.PRIV-15.description": "Turns off Microsoft experiments on the device."
+  "tweak.PRIV-15.description": "Turns off Microsoft experiments on the device.",
+  "tweak.PRIV-03.title": "Windows and Office telemetry",
+  "tweak.PRIV-03.description": "Disables telemetry services, the autologger and Office tasks.",
+  "tweak.PRIV-04.title": "NVIDIA telemetry",
+  "tweak.PRIV-04.description": "Stops the NVIDIA service and disables its tasks.",
+  "tweak.PRIV-05.title": "Data collection through the scheduler",
+  "tweak.PRIV-05.description": "Disables Windows tasks that collect diagnostics.",
+  "tweak.PRIV-14.title": "System monitoring (CDP)",
+  "tweak.PRIV-14.description": "Disables the CDP service and the Task View button.",
+  "tweak.PRIV-16.title": "Diagnostic services",
+  "tweak.PRIV-16.description": "Stops and disables DiagTrack and dmwappushservice without deleting them.",
+  "tweak.PRIV-17.title": "Diagnostic event log",
+  "tweak.PRIV-17.description": "Disables the diagnosticshub.standardcollector service."
 }

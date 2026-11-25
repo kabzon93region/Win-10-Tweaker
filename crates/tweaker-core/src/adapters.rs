@@ -168,12 +168,26 @@ pub trait IFirewall {
     fn has_rule(&self, name: &str) -> Result<bool, AdapterError>;
 }
 
+/// One scheduled task known to the system.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskInfo {
+    /// Full task path, e.g. `\Microsoft\Office\OfficeTelemetryAgentLogOn`.
+    pub path: String,
+    /// Whether the task is enabled.
+    pub enabled: bool,
+}
+
 /// Task Scheduler.
 pub trait IScheduler {
-    /// Enables or disables a stored task by its full path.
-    fn set_enabled(&self, task_path: &str, enabled: bool) -> Result<(), AdapterError>;
+    /// Full paths of tasks in one folder (and its subfolders), without states.
+    ///
+    /// Listing names is cheap; the enabled state is read only for the tasks the
+    /// engine actually needs, so a folder with hundreds of tasks stays fast.
+    fn list(&self, folder: &str) -> Result<Vec<String>, AdapterError>;
     /// Reads the enabled state; `Ok(None)` when the task does not exist.
     fn is_enabled(&self, task_path: &str) -> Result<Option<bool>, AdapterError>;
+    /// Enables or disables a stored task by its full path.
+    fn set_enabled(&self, task_path: &str, enabled: bool) -> Result<(), AdapterError>;
 }
 
 /// Microsoft Store packages.

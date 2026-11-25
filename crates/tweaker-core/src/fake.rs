@@ -262,6 +262,24 @@ impl FakeScheduler {
 }
 
 impl IScheduler for FakeScheduler {
+    fn list(&self, folder: &str) -> Result<Vec<String>, AdapterError> {
+        let trimmed = folder.trim_end_matches('\\');
+        let prefix = if trimmed.is_empty() {
+            "\\".to_owned()
+        } else {
+            format!("{trimmed}\\")
+        };
+        let mut paths: Vec<String> = self
+            .tasks
+            .borrow()
+            .keys()
+            .filter(|path| path.starts_with(&prefix))
+            .cloned()
+            .collect();
+        paths.sort();
+        Ok(paths)
+    }
+
     fn set_enabled(&self, task_path: &str, enabled: bool) -> Result<(), AdapterError> {
         let mut tasks = self.tasks.borrow_mut();
         let state = tasks

@@ -67,7 +67,6 @@
   "section.about": "О программе",
   "hint.about": "Версия, лицензия, обратная связь.",
   "privacy.items": "Пунктов: {count}",
-  "privacy.partial": "Реализовано {done} из {total} пунктов раздела; остальные появятся на следующем шаге.",
   "privacy.reload": "Обновить состояния",
   "privacy.apply": "Применить выбранные",
   "privacy.revert": "Откатить выбранные",
@@ -112,5 +111,17 @@
   "tweak.PRIV-13.title": "Обновление моделей речи",
   "tweak.PRIV-13.description": "Запрещает обновление моделей распознавания речи.",
   "tweak.PRIV-15.title": "Эксперименты Microsoft",
-  "tweak.PRIV-15.description": "Отключает эксперименты Microsoft на устройстве."
+  "tweak.PRIV-15.description": "Отключает эксперименты Microsoft на устройстве.",
+  "tweak.PRIV-03.title": "Телеметрия Windows и Office",
+  "tweak.PRIV-03.description": "Отключает службы телеметрии, автологгер и задачи Office.",
+  "tweak.PRIV-04.title": "Телеметрия NVIDIA",
+  "tweak.PRIV-04.description": "Останавливает службу NVIDIA и отключает её задачи.",
+  "tweak.PRIV-05.title": "Сбор данных через планировщик",
+  "tweak.PRIV-05.description": "Отключает задачи Windows, собирающие диагностику.",
+  "tweak.PRIV-14.title": "Мониторинг системы (CDP)",
+  "tweak.PRIV-14.description": "Отключает службу CDP и кнопку «Представление задач».",
+  "tweak.PRIV-16.title": "Службы диагностики",
+  "tweak.PRIV-16.description": "Останавливает и отключает DiagTrack и dmwappushservice без удаления.",
+  "tweak.PRIV-17.title": "Журнал событий диагностики",
+  "tweak.PRIV-17.description": "Отключает службу diagnosticshub.standardcollector."
 }

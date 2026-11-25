@@ -86,9 +86,10 @@ mod tests {
     use crate::action::Action;
     use crate::model::RiskLevel;
 
-    const EXPECTED_IDS: [&str; 11] = [
-        "PRIV-01", "PRIV-02", "PRIV-06", "PRIV-07", "PRIV-08", "PRIV-09", "PRIV-10", "PRIV-11",
-        "PRIV-12", "PRIV-13", "PRIV-15",
+    const EXPECTED_IDS: [&str; 17] = [
+        "PRIV-01", "PRIV-02", "PRIV-03", "PRIV-04", "PRIV-05", "PRIV-06", "PRIV-07", "PRIV-08",
+        "PRIV-09", "PRIV-10", "PRIV-11", "PRIV-12", "PRIV-13", "PRIV-14", "PRIV-15", "PRIV-16",
+        "PRIV-17",
     ];
 
     #[test]

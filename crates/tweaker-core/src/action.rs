@@ -233,6 +233,31 @@ pub enum Action {
         /// Domains redirected to `0.0.0.0`.
         domains: Vec<String>,
     },
+    /// Enable or disable one scheduled task by its full path.
+    TaskSetEnabled {
+        /// Full task path, e.g. `\Microsoft\Office\OfficeTelemetryAgentLogOn`.
+        path: String,
+        /// Desired enabled state.
+        enabled: bool,
+    },
+    /// Enable or disable every task in a folder whose name starts with one of the prefixes.
+    ///
+    /// This mirrors the wildcard notation of the feature list (`NvTmRep*`) without
+    /// hard-coding GUID-suffixed task names.
+    TaskSetEnabledMatching {
+        /// Folder to scan, e.g. `\Microsoft\Office`; `\` scans the whole tree.
+        folder: String,
+        /// Name prefixes to match; an empty list matches every task in the folder.
+        prefixes: Vec<String>,
+        /// Desired enabled state.
+        enabled: bool,
+        /// Treat "no task matches" as nothing to do instead of an error.
+        ///
+        /// Used for tasks that belong to optional software (Office, NVIDIA), so a
+        /// machine without that software does not become "unavailable".
+        #[serde(default)]
+        optional: bool,
+    },
 }
 
 /// First line of the managed hosts block.
@@ -341,6 +366,24 @@ impl Action {
                     domains.len(),
                     path.display()
                 )
+            }
+            Action::TaskSetEnabled { path, enabled } => {
+                format!("task {path}: enabled = {enabled}")
+            }
+            Action::TaskSetEnabledMatching {
+                folder,
+                prefixes,
+                enabled,
+                ..
+            } => {
+                if prefixes.is_empty() {
+                    format!("tasks in {folder}: enabled = {enabled}")
+                } else {
+                    format!(
+                        "tasks in {folder} with prefixes {}: enabled = {enabled}",
+                        prefixes.join(", ")
+                    )
+                }
             }
         }
     }

@@ -68,6 +68,92 @@
     ]
   },
   {
+    "id": "PRIV-03",
+    "section": "privacy",
+    "titleKey": "tweak.PRIV-03.title",
+    "descriptionKey": "tweak.PRIV-03.description",
+    "risk": "high",
+    "requiresReboot": true,
+    "actions": [
+      {
+        "kind": "registry_set",
+        "key": { "root": "hklm", "path": "SYSTEM\\CurrentControlSet\\Control\\WMI\\Autologger\\AutoLogger-Diagtrack-Listener" },
+        "name": "Start",
+        "value": { "kind": "dword", "data": 0 }
+      },
+      { "kind": "service_start_mode", "service": "DiagTrack", "mode": "disabled" },
+      {
+        "kind": "service_start_mode",
+        "service": "dmwappushservice",
+        "mode": "disabled"
+      },
+      {
+        "kind": "task_set_enabled_matching",
+        "folder": "\\Microsoft\\Office",
+        "prefixes": ["OfficeTelemetry", "OfficeBackgroundTaskHandler"],
+        "enabled": false,
+        "optional": true
+      }
+    ]
+  },
+  {
+    "id": "PRIV-04",
+    "section": "privacy",
+    "titleKey": "tweak.PRIV-04.title",
+    "descriptionKey": "tweak.PRIV-04.description",
+    "risk": "high",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "service_stop", "service": "NvTelemetryContainer" },
+      {
+        "kind": "service_start_mode",
+        "service": "NvTelemetryContainer",
+        "mode": "disabled"
+      },
+      {
+        "kind": "task_set_enabled_matching",
+        "folder": "\\",
+        "prefixes": ["NvTmRep", "NvTmMon"],
+        "enabled": false,
+        "optional": true
+      }
+    ]
+  },
+  {
+    "id": "PRIV-05",
+    "section": "privacy",
+    "titleKey": "tweak.PRIV-05.title",
+    "descriptionKey": "tweak.PRIV-05.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "task_set_enabled_matching",
+        "folder": "\\Microsoft\\Windows",
+        "prefixes": [
+          "WinSAT",
+          "Proxy",
+          "Microsoft Compatibility Appraiser",
+          "ProgramDataUpdater",
+          "StartupAppTask",
+          "PcaPatchDbTask",
+          "PcaGeneralDb0",
+          "PcaGeneralDb1",
+          "Sqm-Tasks",
+          "GatherNetworkInfo",
+          "Microsoft-Windows-DiskDiagnosticDataCollector",
+          "QueueReporting",
+          "KernelCeipTask",
+          "UsbCeip",
+          "Consolidator",
+          "DmClient",
+          "DmClientOnScenarioDownload"
+        ],
+        "enabled": false
+      }
+    ]
+  },
+  {
     "id": "PRIV-06",
     "section": "privacy",
     "titleKey": "tweak.PRIV-06.title",
@@ -316,6 +402,23 @@
     ]
   },
   {
+    "id": "PRIV-14",
+    "section": "privacy",
+    "titleKey": "tweak.PRIV-14.title",
+    "descriptionKey": "tweak.PRIV-14.description",
+    "risk": "high",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "service_start_mode", "service": "CDPUserSvc", "mode": "disabled" },
+      {
+        "kind": "registry_set",
+        "key": { "root": "hkcu", "path": "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" },
+        "name": "ShowTaskViewButton",
+        "value": { "kind": "dword", "data": 0 }
+      }
+    ]
+  },
+  {
     "id": "PRIV-15",
     "section": "privacy",
     "titleKey": "tweak.PRIV-15.title",
@@ -328,6 +431,39 @@
         "key": { "root": "hklm", "path": "SOFTWARE\\Microsoft\\PolicyManager\\current\\device\\System" },
         "name": "AllowExperimentation",
         "value": { "kind": "dword", "data": 0 }
+      }
+    ]
+  },
+  {
+    "id": "PRIV-16",
+    "section": "privacy",
+    "titleKey": "tweak.PRIV-16.title",
+    "descriptionKey": "tweak.PRIV-16.description",
+    "risk": "high",
+    "requiresReboot": true,
+    "actions": [
+      { "kind": "service_stop", "service": "DiagTrack" },
+      { "kind": "service_start_mode", "service": "DiagTrack", "mode": "disabled" },
+      { "kind": "service_stop", "service": "dmwappushservice" },
+      {
+        "kind": "service_start_mode",
+        "service": "dmwappushservice",
+        "mode": "disabled"
+      }
+    ]
+  },
+  {
+    "id": "PRIV-17",
+    "section": "privacy",
+    "titleKey": "tweak.PRIV-17.title",
+    "descriptionKey": "tweak.PRIV-17.description",
+    "risk": "high",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "service_start_mode",
+        "service": "diagnosticshub.standardcollector.service",
+        "mode": "disabled"
       }
     ]
   }
