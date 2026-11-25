@@ -9,6 +9,8 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use eframe::egui;
+use tweaker_core::action::{Action, RegistryKey, RegistryRoot, RegistryValue};
+use tweaker_core::adapters::{IStartup, StartupEntry, StartupSource};
 use tweaker_core::catalog;
 use tweaker_core::engine::Engine;
 use tweaker_core::journal::Journal;
@@ -25,6 +27,7 @@ use tweaker_windows::registry::WindowsRegistry;
 use tweaker_windows::scheduler::WindowsScheduler;
 use tweaker_windows::services::WindowsServices;
 use tweaker_windows::single_instance::SingleInstance;
+use tweaker_windows::startup::WindowsStartup;
 
 use crate::i18n::{self, Localizer};
 
@@ -290,6 +293,17 @@ struct TweakerApp {
     scheduler: WindowsScheduler,
     journal: Option<Journal>,
     catalog: CatalogView,
+    startup: StartupView,
+}
+
+/// UI state of the autorun section.
+#[derive(Default)]
+struct StartupView {
+    entries: Vec<StartupEntry>,
+    selected: Option<usize>,
+    report: Option<String>,
+    pending_delete: Option<usize>,
+    loaded: bool,
 }
 
 /// UI state of one catalog section.
@@ -415,6 +429,7 @@ impl TweakerApp {
             scheduler: WindowsScheduler,
             journal,
             catalog,
+            startup: StartupView::default(),
         }
     }
 
@@ -425,6 +440,11 @@ impl TweakerApp {
         }
         self.selected = index;
         let id = self.sections[index].id.clone();
+        self.startup = StartupView::default();
+        if id == "autorun" {
+            self.refresh_startup();
+            return;
+        }
         if self.catalog.section == id {
             return;
         }
@@ -433,6 +453,31 @@ impl TweakerApp {
             ..CatalogView::default()
         };
         load_catalog(&mut self.catalog);
+    }
+
+    /// Reloads the autorun list from the system.
+    fn refresh_startup(&mut self) {
+        match WindowsStartup.entries() {
+            Ok(entries) => {
+                logging::info(&format!("autorun: {} entries", entries.len()));
+                self.startup.entries = entries;
+                self.startup.loaded = true;
+                if self
+                    .startup
+                    .selected
+                    .is_some_and(|index| index >= self.startup.entries.len())
+                {
+                    self.startup.selected = None;
+                }
+            }
+            Err(error) => {
+                logging::error(&format!("autorun: cannot read entries: {}", error.message));
+                self.startup.entries.clear();
+                self.startup.selected = None;
+                self.startup.loaded = true;
+                self.startup.report = Some(error.message);
+            }
+        }
     }
 
     /// In `--screenshot` mode, closes the window and records a timeout if the
@@ -610,7 +655,9 @@ impl TweakerApp {
                     ui.add_space(10.0);
                     ui.separator();
                     ui.add_space(10.0);
-                    if has_catalog {
+                    if section.id == "autorun" {
+                        self.draw_autorun(ui);
+                    } else if has_catalog {
                         self.draw_catalog(ui);
                     } else {
                         ui.label(egui::RichText::new(kind_text).size(13.0));
@@ -639,6 +686,216 @@ impl TweakerApp {
                     }
                 });
         });
+    }
+
+    /// Autorun list: five sources, toggle and delete through the engine.
+    fn draw_autorun(&mut self, ui: &mut egui::Ui) {
+        if !self.startup.loaded {
+            self.refresh_startup();
+        }
+        let loc = &self.loc;
+        let rows: Vec<(String, String, String, bool, String)> = self
+            .startup
+            .entries
+            .iter()
+            .map(|entry| {
+                let state = if entry.enabled {
+                    loc.t("autorun.enabled")
+                } else {
+                    loc.t("autorun.disabled")
+                };
+                (
+                    entry.name.clone(),
+                    loc.t(&format!("autorun.source.{}", entry.source.label())),
+                    entry.command.clone(),
+                    entry.enabled,
+                    state,
+                )
+            })
+            .collect();
+        let mut action: Option<StartupAction> = None;
+        ui.horizontal(|ui| {
+            if ui.button(loc.t("autorun.refresh")).clicked() {
+                action = Some(StartupAction::Refresh);
+            }
+            ui.label(loc.fmt("kind.catalog", &[("count", &rows.len().to_string())]));
+        });
+        ui.add_space(8.0);
+        if rows.is_empty() {
+            ui.label(loc.t("autorun.empty"));
+        } else {
+            for (index, (name, source, command, enabled, state)) in rows.iter().enumerate() {
+                ui.horizontal(|ui| {
+                    let selected = self.startup.selected == Some(index);
+                    if ui.selectable_label(selected, name).clicked() {
+                        action = Some(StartupAction::Select(index));
+                    }
+                    ui.label(
+                        egui::RichText::new(source)
+                            .size(11.0)
+                            .color(egui::Color32::from_gray(120)),
+                    );
+                    let color = if *enabled {
+                        egui::Color32::from_rgb(21, 128, 61)
+                    } else {
+                        egui::Color32::from_gray(120)
+                    };
+                    ui.label(egui::RichText::new(state).size(11.0).color(color));
+                    ui.label(
+                        egui::RichText::new(short_path(std::path::Path::new(command)))
+                            .size(11.0)
+                            .color(egui::Color32::from_gray(140)),
+                    );
+                });
+            }
+        }
+        if let Some(index) = self.startup.selected
+            && let Some(entry) = self.startup.entries.get(index)
+        {
+            ui.add_space(10.0);
+            ui.separator();
+            ui.add_space(6.0);
+            ui.label(loc.fmt("autorun.command", &[("command", &entry.command)]));
+            ui.horizontal(|ui| {
+                let toggle = if entry.enabled {
+                    loc.t("autorun.toggle_off")
+                } else {
+                    loc.t("autorun.toggle_on")
+                };
+                if ui.button(toggle).clicked() {
+                    action = Some(StartupAction::Toggle(index));
+                }
+                if entry.source != StartupSource::ScheduledTask
+                    && ui.button(loc.t("autorun.delete")).clicked()
+                {
+                    action = Some(StartupAction::AskDelete(index));
+                }
+                if entry.source != StartupSource::ScheduledTask
+                    && ui.button(loc.t("autorun.open")).clicked()
+                {
+                    action = Some(StartupAction::Open(index));
+                }
+            });
+        }
+        if self.startup.pending_delete.is_some() {
+            egui::Frame::group(ui.style())
+                .inner_margin(egui::Margin::same(12))
+                .show(ui, |ui| {
+                    ui.label(
+                        egui::RichText::new(loc.t("autorun.confirm"))
+                            .size(14.0)
+                            .strong(),
+                    );
+                    ui.horizontal(|ui| {
+                        if ui.button(loc.t("autorun.confirm_yes")).clicked() {
+                            action = Some(StartupAction::ConfirmDelete);
+                        }
+                        if ui.button(loc.t("autorun.cancel")).clicked() {
+                            action = Some(StartupAction::CancelDelete);
+                        }
+                    });
+                });
+        }
+        if let Some(report) = &self.startup.report {
+            ui.add_space(8.0);
+            ui.label(report);
+        }
+
+        match action {
+            Some(StartupAction::Refresh) => self.refresh_startup(),
+            Some(StartupAction::Select(index)) => {
+                self.startup.selected = Some(index);
+                self.startup.pending_delete = None;
+            }
+            Some(StartupAction::Toggle(index)) => self.toggle_startup(index),
+            Some(StartupAction::AskDelete(index)) => {
+                self.startup.pending_delete = Some(index);
+            }
+            Some(StartupAction::ConfirmDelete) => {
+                if let Some(index) = self.startup.pending_delete.take() {
+                    self.delete_startup(index);
+                }
+            }
+            Some(StartupAction::CancelDelete) => {
+                self.startup.pending_delete = None;
+            }
+            Some(StartupAction::Open(index)) => self.open_startup_location(index),
+            None => {}
+        }
+    }
+
+    fn toggle_startup(&mut self, index: usize) {
+        let Some(entry) = self.startup.entries.get(index).cloned() else {
+            return;
+        };
+        let action = startup_toggle_action(&entry);
+        let label = entry.name.clone();
+        self.apply_startup(vec![action], &label);
+        self.refresh_startup();
+    }
+
+    fn delete_startup(&mut self, index: usize) {
+        let Some(entry) = self.startup.entries.get(index).cloned() else {
+            return;
+        };
+        let Some(action) = startup_delete_action(&entry) else {
+            self.startup.report = Some(self.loc.t("autorun.task_delete"));
+            return;
+        };
+        let label = entry.name.clone();
+        self.apply_startup(vec![action], &label);
+        self.startup.selected = None;
+        self.refresh_startup();
+    }
+
+    fn open_startup_location(&mut self, index: usize) {
+        let Some(entry) = self.startup.entries.get(index) else {
+            return;
+        };
+        if let Err(error) = WindowsStartup.open_location(entry) {
+            self.startup.report =
+                Some(self.loc.fmt("autorun.error", &[("reason", &error.message)]));
+        }
+    }
+
+    fn apply_startup(&mut self, actions: Vec<Action>, label: &str) {
+        let Some(journal) = self.journal.as_ref() else {
+            let reason = "the change journal is unavailable".to_owned();
+            self.startup.report = Some(
+                self.loc
+                    .fmt("privacy.journal_missing", &[("reason", &reason)]),
+            );
+            return;
+        };
+        let tweak = TweakDefinition::new(
+            "AUTORUN",
+            "autorun",
+            "section.autorun",
+            "hint.autorun",
+            RiskLevel::Medium,
+            false,
+            actions,
+        );
+        let engine = Engine::new(
+            &self.registry,
+            &self.files,
+            &self.services,
+            &self.processes,
+            &self.scheduler,
+            journal,
+        );
+        let report = engine.apply_tweak(&tweak);
+        if report.success() {
+            self.startup.report = Some(self.loc.fmt("autorun.done", &[("name", label)]));
+        } else {
+            let reason = report
+                .failed
+                .first()
+                .map(|failure| failure.error.clone())
+                .or(report.error)
+                .unwrap_or_default();
+            self.startup.report = Some(self.loc.fmt("autorun.error", &[("reason", &reason)]));
+        }
     }
 
     fn draw_catalog(&mut self, ui: &mut egui::Ui) {
@@ -1092,6 +1349,73 @@ impl eframe::App for TweakerApp {
     }
 }
 
+/// One click on the autorun screen.
+enum StartupAction {
+    Refresh,
+    Select(usize),
+    Toggle(usize),
+    AskDelete(usize),
+    ConfirmDelete,
+    CancelDelete,
+    Open(usize),
+}
+
+const RUN_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
+const RUN_WOW_KEY: &str = r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run";
+const APPROVED_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved";
+
+/// Builds the action that flips the enabled state.
+fn startup_toggle_action(entry: &StartupEntry) -> Action {
+    let enabled = !entry.enabled;
+    let approval = format!(
+        "{APPROVED_KEY}\\{}",
+        match entry.source {
+            StartupSource::HklmRun32 => "Run32",
+            StartupSource::StartupFolder => "StartupFolder",
+            _ => "Run",
+        }
+    );
+    match entry.source {
+        StartupSource::ScheduledTask => Action::TaskSetEnabled {
+            path: entry.name.clone(),
+            enabled,
+        },
+        _ => Action::RegistrySet {
+            key: RegistryKey::new(RegistryRoot::Hkcu, approval),
+            name: entry.name.clone(),
+            value: RegistryValue::Binary(approval_binary(enabled)),
+        },
+    }
+}
+
+/// Builds the action that removes the entry; tasks cannot be deleted here yet.
+fn startup_delete_action(entry: &StartupEntry) -> Option<Action> {
+    match entry.source {
+        StartupSource::HkcuRun => Some(Action::RegistryDelete {
+            key: RegistryKey::new(RegistryRoot::Hkcu, RUN_KEY),
+            name: entry.name.clone(),
+        }),
+        StartupSource::HklmRun => Some(Action::RegistryDelete {
+            key: RegistryKey::new(RegistryRoot::Hklm, RUN_KEY),
+            name: entry.name.clone(),
+        }),
+        StartupSource::HklmRun32 => Some(Action::RegistryDelete {
+            key: RegistryKey::new(RegistryRoot::Hklm, RUN_WOW_KEY),
+            name: entry.name.clone(),
+        }),
+        StartupSource::StartupFolder => Some(Action::FileDeleteAny {
+            path: entry.location.clone(),
+        }),
+        StartupSource::ScheduledTask => None,
+    }
+}
+
+/// `StartupApproved` keeps a 12-byte record; 2 means enabled, 3 means disabled.
+fn approval_binary(enabled: bool) -> Vec<u8> {
+    let mut bytes = vec![0u8; 12];
+    bytes[0] = if enabled { 2 } else { 3 };
+    bytes
+}
 /// Converts the egui image to RGBA and writes a PNG file.
 fn save_screenshot(path: &std::path::Path, image: &egui::ColorImage) -> Result<(), String> {
     let [width, height] = image.size;
@@ -1148,6 +1472,91 @@ mod tests {
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../target/test-tmp")
             .join(format!("app-{tag}-{unique}"))
+    }
+
+    fn startup_entry(source: StartupSource, name: &str) -> StartupEntry {
+        StartupEntry {
+            source,
+            name: name.to_owned(),
+            command: format!("C:\\{name}.exe"),
+            enabled: true,
+            location: std::path::PathBuf::from(format!("C:\\{name}.lnk")),
+        }
+    }
+
+    #[test]
+    fn startup_toggle_uses_the_approval_record() {
+        let action = startup_toggle_action(&startup_entry(StartupSource::HkcuRun, "App"));
+        match action {
+            Action::RegistrySet { key, name, value } => {
+                assert_eq!(key.root, RegistryRoot::Hkcu);
+                assert!(key.path.ends_with(r"StartupApproved\Run"));
+                assert_eq!(name, "App");
+                assert_eq!(
+                    value,
+                    RegistryValue::Binary(vec![3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+                );
+            }
+            other => panic!("unexpected action: {other:?}"),
+        }
+        let action = startup_toggle_action(&startup_entry(StartupSource::HklmRun32, "Old"));
+        match action {
+            Action::RegistrySet { key, .. } => {
+                assert!(key.path.ends_with(r"StartupApproved\Run32"))
+            }
+            other => panic!("unexpected action: {other:?}"),
+        }
+        let action =
+            startup_toggle_action(&startup_entry(StartupSource::ScheduledTask, r"\Test\Task"));
+        assert_eq!(
+            action,
+            Action::TaskSetEnabled {
+                path: r"\Test\Task".to_owned(),
+                enabled: false
+            }
+        );
+    }
+
+    #[test]
+    fn startup_delete_uses_the_right_source() {
+        assert_eq!(
+            startup_delete_action(&startup_entry(StartupSource::HkcuRun, "App")),
+            Some(Action::RegistryDelete {
+                key: RegistryKey::new(RegistryRoot::Hkcu, RUN_KEY),
+                name: "App".to_owned()
+            })
+        );
+        assert_eq!(
+            startup_delete_action(&startup_entry(StartupSource::HklmRun, "Shared")),
+            Some(Action::RegistryDelete {
+                key: RegistryKey::new(RegistryRoot::Hklm, RUN_KEY),
+                name: "Shared".to_owned()
+            })
+        );
+        assert_eq!(
+            startup_delete_action(&startup_entry(StartupSource::HklmRun32, "Old")),
+            Some(Action::RegistryDelete {
+                key: RegistryKey::new(RegistryRoot::Hklm, RUN_WOW_KEY),
+                name: "Old".to_owned()
+            })
+        );
+        assert_eq!(
+            startup_delete_action(&startup_entry(StartupSource::StartupFolder, "Tool")),
+            Some(Action::FileDeleteAny {
+                path: std::path::PathBuf::from(r"C:\Tool.lnk")
+            })
+        );
+        assert_eq!(
+            startup_delete_action(&startup_entry(StartupSource::ScheduledTask, r"\Test\Task")),
+            None
+        );
+    }
+
+    #[test]
+    fn startup_approval_bytes_mark_enabled_and_disabled() {
+        assert_eq!(approval_binary(true)[0], 2);
+        assert_eq!(approval_binary(false)[0], 3);
+        assert_eq!(approval_binary(true).len(), 12);
     }
 
     #[test]

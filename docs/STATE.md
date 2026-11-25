@@ -1,19 +1,19 @@
 # Состояние работ
 
-Обновлено: 2026-11-25 (этап 5, часть 4: раздел «Контекстное меню», 15 пунктов; CTX-07/08 исключены решением D-31).
+Обновлено: 2026-11-25 (этап 5, часть 5: раздел «Автозагрузка» — пять источников, переключение и удаление через движок).
 
 ## Текущий статус
 
 | Параметр | Значение |
 |---|---|
-| Этап | 5 — остальные разделы: части 1–4 (`services` 24/24, `ui` 17/17, `system` 18/18, `context` 15/17); дальше `autorun`, `apps` |
+| Этап | 5 — остальные разделы: части 1–5 (`services`, `ui`, `system`, `context`, `autorun`); остался `apps` |
 | Код | `Cargo.toml`, `crates/tweaker-core`, `crates/tweaker-windows`, `crates/tweaker-app` |
 | Версия | 0.1.0 |
-| Git | `ce6829f` (этап 5, часть 4); часть 3 — `4e21c1d` |
+| Git | `88a18d0` (этап 5, часть 4); часть 5 — коммит после аудита |
 | Сборка | `cargo build --workspace` — успешно; `cargo build --release -p tweaker-app` — успешно |
-| Артефакт | `target/release/wintweaker.exe` — 7 068 160 байт, sha256 `BBB4121F934BAE69C22331E4472BE01A83750F96A5C4B93214888EC777F56EC2` |
-| Тесты | `cargo test --workspace` — 249 passed, 1 ignored (app 20, core 97, core-tests 21+26+18+22+18, windows 27) |
-| Проверки | clippy/fmt чисто; снимки `services.png`, `ui.png`, `system.png`, `context.png` — 24, 17, 18 и 15 пунктов; `--selftest` rc=0 |
+| Артефакт | `target/release/wintweaker.exe` — 7 157 760 байт, sha256 `F3CBBE4D62E1E9CA885D1916F0857F74FC3EFDE8407759EF8E41F7960F245A4E` |
+| Тесты | `cargo test --workspace` — 258 passed, 1 ignored (app 23, core 98, core-tests 21+26+18+22+18, windows 32) |
+| Проверки | clippy/fmt чисто; снимки `services.png`, `ui.png`, `system.png`, `context.png`, `autorun3.png`; автозагрузка — 37 записей на этом ПК, включая HKLM Run; `--selftest` rc=0 |
 | Запуск | debug: ≈1,8 с до первых кадров; release-замер — этап 8 |
 | Блокирует | нет; открытые дефекты D-2…D-8 прежние |
 
@@ -41,9 +41,9 @@
 |---|---|
 | `Cargo.toml` | workspace из трёх crates, resolver 3, edition 2024 |
 | `crates/tweaker-core` | модель `TweakDefinition/Action/Plan`, каталог разделов (`data/sections.json`) и разделы `privacy` (17), `services` (24), `ui` (17), движок apply/detect/revert, журнал JSONL с двумя фазами, трейты адаптеров и фейки, действия hosts-блока, задач, удаления ключей и записи бинарных файлов, пути, логгер, `Lang`; приёмочные тесты каталога в `tests/` |
-| `crates/tweaker-windows` | адаптеры реестра, файлов, процессов, служб и планировщика задач (через `schtasks.exe`); права администратора и перезапуск, язык системы, сведения об ОС, защита от второй копии (`single_instance`), системное сообщение (`message`) |
+| `crates/tweaker-windows` | адаптеры реестра, файлов, процессов, служб, планировщика задач и автозагрузки; права администратора и перезапуск, язык системы, сведения об ОС, защита от второй копии, системное сообщение |
 | `crates/tweaker-app` | окно egui, меню 14 разделов, универсальный экран каталога (любой раздел с данными), ru/en, режимы `--selftest`, `--smoke`, `--screenshot`, `--section <id>`, проба `tweak_probe` |
-| `crates/tweaker-app/i18n` | `ru.json`, `en.json` — по 275 строк, полнота проверяется тестом |
+| `crates/tweaker-app/i18n` | `ru.json`, `en.json` — по 295 строк, полнота проверяется тестом |
 | `crates/tweaker-app/build.rs` | манифест: release — `requireAdministrator`, debug — `asInvoker` |
 
 ## План этапов
@@ -55,7 +55,7 @@
 | 2 | Движок: модели `Tweak/Plan/Action`, адаптеры-интерфейсы, журнал JSONL, apply/detect/revert на одном пункте | unit-тесты на фейковых адаптерах зелёные | завершён |
 | 3 | Первый раздел каталога — `privacy` (17 пунктов) | все 17 пунктов применяются и откатываются | завершён |
 | 4 | Тесты: unit по разделу, смоук и негативные сценарии по `TESTPLAN.md` | отчёт о тестировании | завершён |
-| 5 | Остальные разделы настроек (context, ui, system, services, autorun, apps) | по критериям `TESTPLAN.md` | в работе: `services` 24/24, `ui` 17/17, `system` 18/18, `context` 15/17 (CTX-07/08 исключены); остались `autorun`, `apps` |
+| 5 | Остальные разделы настроек (context, ui, system, services, autorun, apps) | по критериям `TESTPLAN.md` | в работе: `services` 24/24, `ui` 17/17, `system` 18/18, `context` 15/17, `autorun` (5 источников) готов; остался `apps` |
 | 6 | Очистка и оптимизация (опасные операции, предпросмотр, отмена) | 🔴-пункты только с подтверждением | не начат |
 | 7 | Сервисные разделы: sysinfo, backup, профиль, обновления, VirusTotal, about, maintenance | по решению владельца | не начат |
 | 8 | Приёмка: чек-лист `TESTPLAN.md`, воспроизводимая сборка, документация | приёмочный отчёт | не начат |
@@ -69,6 +69,7 @@
 | Каталог `ui` | `crates/tweaker-core/data/tweaks/ui.json` | 17 пунктов, ids UI-01…UI-17, реестр, удаление ключей, пустая иконка для стрелок ярлыков |
 | Каталог `system` | `crates/tweaker-core/data/tweaks/system.json` | 18 пунктов, ids SYS-01…SYS-AZ, реестр, службы, задачи, обратимые команды netsh/PowerShell |
 | Каталог `context` | `crates/tweaker-core/data/tweaks/context.json` | 15 пунктов (CTX-07/08 исключены), пункты меню, скрипты, правила брандмауэра по клику |
+| Раздел `autorun` | `crates/tweaker-windows/src/startup.rs`, `crates/tweaker-app/src/app.rs` | 5 источников (Run HKCU/HKLM/HKLM32, папка, задачи), переключение и удаление через журналируемые действия |
 | Универсальный экран каталога | `crates/tweaker-app/src/app.rs` | любой раздел с данными: список, состояния, риск, предпросмотр, подтверждение, apply/revert; `--section <id>` |
 | Раздел `privacy` в окне | `crates/tweaker-app/src/app.rs` | список 17 пунктов, состояния, предпросмотр, подтверждение, отчёт; PNG `stage3-full.png` |
 | Раздел `services` в окне | `crates/tweaker-app/src/app.rs` | 24 пункта, реальные состояния, риск, пометка перезапуска; PNG `services.png` |
@@ -77,12 +78,12 @@
 | Зафиксированные зависимости | `Cargo.lock` | `cargo build --locked` |
 | Движок и журнал | `crates/tweaker-core/src/{action,adapters,catalog,model,journal,engine,fake}.rs` | apply/detect/revert/журнал/сбой/восстановление/hosts/задачи |
 | Приёмочные тесты разделов | `crates/tweaker-core/tests/{common,privacy_section,services_section,ui_section,system_section,context_section}.rs` | 21 + 26 + 18 + 22 + 18 тестов: полный цикл по каждому пункту, ошибки адаптеров, отсутствие служб |
-| Адаптеры Windows | `crates/tweaker-windows/src/{registry,files,process,services,scheduler,single_instance,message}.rs` | чтение HKLM, служб и задач; защита от второй копии; запись HKCU проверена standalone-запуском вне песочницы |
-| Юнит-тесты | `crates/*/src/**` (`#[cfg(test)]`) | 249 passed, 1 ignored |
+| Адаптеры Windows | `crates/tweaker-windows/src/{registry,files,process,services,scheduler,startup,single_instance,message}.rs` | чтение HKLM, служб, задач и автозагрузки; защита от второй копии; запись HKCU проверена standalone-запуском вне песочницы |
+| Юнит-тесты | `crates/*/src/**` (`#[cfg(test)]`) | 258 passed, 1 ignored |
 | Отчёт о тестировании | `docs/TEST_REPORT.md` | 31/46 проверок TESTPLAN пройдено, 15 отложено, 0 провалов (этап 4) |
-| Карта кода | `docs/CODE_MAP.md` | обновлена на этапе 5, часть 1 |
+| Карта кода | `docs/CODE_MAP.md` | обновлена на этапе 5, часть 5 |
 | Отчёт самопроверки | `%LocalAppData%\WinTweaker\logs\wintweaker.log` | `--selftest` rc=0 |
-| Снимки окна | `%TEMP%\wintweaker-run\{services,ui,system,context}.png` (вне git) | 1200×780, разделы `services`, `ui`, `system`, `context`, сняты самим приложением |
+| Снимки окна | `%TEMP%\wintweaker-run\{services,ui,system,context,autorun}.png` (вне git) | 1200×780, сняты самим приложением |
 | Release-бинарник | `target/release/wintweaker.exe` (не в git) | см. «Артефакт» выше |
 
 ## Журнал этапов
@@ -98,4 +99,5 @@
 | 2026-11-25 | 5 (часть 1) | Универсальный экран каталога вместо жёстко привязанного `privacy`: загрузка любого раздела по id, переключение в меню, флаг `--section <id>`; раздел `services` — 24 пункта (стоп + `Start=4`, откат по снимку); i18n 175 строк; тесты `common`/`services_section` | `cargo test` 178 passed (app 20, core 87, core-tests 21+26, windows 24), 1 ignored; clippy/fmt чисто; снимок `services.png` — 24 пункта с реальными состояниями; `--section` проверен |
 | 2026-11-25 | 5 (часть 2) | Новые действия `RegistryDeleteKey` (снимок всего дерева ключа) и `FileWriteBytes` (бинарный файл); раздел `ui` — 17 пунктов (цвета, шрифты, кнопки, папки «Этот компьютер», стрелки ярлыков, Проводник, классическое меню, прокрутка); пустая иконка 16×16 в данных; i18n 209 строк | `cargo test` 204 passed (app 20, core 92, core-tests 21+26+18, windows 27), 1 ignored; снимок `ui.png` — 17 пунктов с реальными состояниями |
 | 2026-11-25 | 5 (часть 3) | Действие `ProcessRunReversible` (команда + обратная команда, состояние «применено» по записи журнала); раздел `system` — 18 пунктов: Уведомления, IE, Защитник/SmartScreen, UAC, раскладка, электропитание, диагностика памяти, Teredo/IPv6, Cortana, IE, ярлыки, кэш ФС, задержка запуска, быстрый доступ, смайлики, просмотрщик фото, OneDrive, PAC-прокси; i18n 245 строк | `cargo test` 230 passed (app 20, core 96, core-tests 21+26+18+22, windows 27), 1 ignored; снимок `system.png` — 18 пунктов |
-| 2026-11-25 | 5 (часть 4) | Раздел `context` — 15 пунктов: владение, меню «Компьютер», cmd, ShellNew, скрытые файлы, копирование картинки, брандмауэр по клику, очистка папки, символические ссылки, .nfo, WMP, задержка меню, лишние пункты, «Создать», персонализация; CTX-07/08 (Imgur/файлообменник) исключены D-31; i18n 275 строк | `cargo test` 249 passed (app 20, core 97, core-tests 21+26+18+22+18, windows 27), 1 ignored; снимок `context.png` — 15 пунктов |
+| 2026-11-25 | 5 (часть 4) | Раздел `context` — 15 пунктов: владение, меню «Компьютер», cmd, ShellNew, скрытые файлы, копирование картинки, брандмауэр по клику, очистка папки, символические ссылки, .nfo, WMP, задержка меню, лишние пункты, «Создать», персонализация; CTX-07/08 исключены D-31; i18n 275 строк | `cargo test` 249 passed (app 20, core 97, core-tests 21+26+18+22+18, windows 27), 1 ignored; снимок `context.png` — 15 пунктов |
+| 2026-11-25 | 5 (часть 5) | Раздел `autorun`: адаптер `IStartup` (Run HKCU/HKLM/HKLM32, папка «Автозагрузка», задачи вне `\Microsoft\Windows`), состояние по `StartupApproved`; в окне список, переключение через движок (`RegistrySet` binary / `TaskSetEnabled`), удаление через `RegistryDelete`/`FileDeleteAny` с подтверждением, открытие расположения; i18n 295 строк | `cargo test` 258 passed (app 23, core 98, core-tests 21+26+18+22+18, windows 32), 1 ignored; живой список — 37 записей, включая HKLM Run; снимок `autorun3.png` |

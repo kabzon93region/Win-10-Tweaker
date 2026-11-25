@@ -160,6 +160,58 @@ pub trait IFileSystem {
     fn delete(&self, path: &Path) -> Result<(), AdapterError>;
 }
 
+/// Where a startup entry comes from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StartupSource {
+    /// `HKCU\...\Run`.
+    HkcuRun,
+    /// `HKLM\...\Run`.
+    HklmRun,
+    /// `HKLM\SOFTWARE\WOW6432Node\...\Run`.
+    HklmRun32,
+    /// A shortcut in the user's or the common Startup folder.
+    StartupFolder,
+    /// A task in the Task Scheduler library (non-Microsoft folder).
+    ScheduledTask,
+}
+
+impl StartupSource {
+    /// Stable label used by the UI and the journal preview.
+    pub fn label(self) -> &'static str {
+        match self {
+            StartupSource::HkcuRun => "hkcu_run",
+            StartupSource::HklmRun => "hklm_run",
+            StartupSource::HklmRun32 => "hklm_run32",
+            StartupSource::StartupFolder => "startup_folder",
+            StartupSource::ScheduledTask => "scheduled_task",
+        }
+    }
+}
+
+/// One program that starts with Windows.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StartupEntry {
+    /// Where the entry is registered.
+    pub source: StartupSource,
+    /// Value name, file name or full task path.
+    pub name: String,
+    /// Command line or file path shown to the user.
+    pub command: String,
+    /// Whether the entry starts with Windows.
+    pub enabled: bool,
+    /// File or folder to open in Explorer.
+    pub location: PathBuf,
+}
+
+/// Startup entries as shown in the autorun section.
+pub trait IStartup {
+    /// All entries from the five sources.
+    fn entries(&self) -> Result<Vec<StartupEntry>, AdapterError>;
+    /// Opens the entry location in Explorer.
+    fn open_location(&self, entry: &StartupEntry) -> Result<(), AdapterError>;
+}
+
 /// Windows service control.
 pub trait IServiceControl {
     /// Reads the current state; `Ok(None)` when the service is not installed.

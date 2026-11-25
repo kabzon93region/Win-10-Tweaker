@@ -207,6 +207,13 @@ pub enum Action {
         /// Target file.
         path: PathBuf,
     },
+    /// Delete a file whose contents may be binary (shortcuts, icons).
+    ///
+    /// The snapshot keeps the raw bytes so the revert restores the file exactly.
+    FileDeleteAny {
+        /// Target file.
+        path: PathBuf,
+    },
     /// Write a raw binary file, creating parent folders if needed.
     FileWriteBytes {
         /// Target file.
@@ -380,7 +387,9 @@ impl Action {
             Action::FileWriteBytes { path, bytes } => {
                 format!("write {} ({} bytes, binary)", path.display(), bytes.len())
             }
-            Action::FileDelete { path } => format!("delete {}", path.display()),
+            Action::FileDelete { path } | Action::FileDeleteAny { path } => {
+                format!("delete {}", path.display())
+            }
             Action::ServiceStart { service } => format!("start service {service}"),
             Action::ServiceStop { service } => format!("stop service {service}"),
             Action::ServiceStartMode { service, mode } => {

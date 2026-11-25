@@ -24,8 +24,8 @@ mod test_support;
 pub use action::{Action, RegistryKey, RegistryRoot, RegistryValue, ServiceStartMode};
 pub use adapters::{
     AdapterError, FirewallDirection, FirewallRule, IAppx, IFileSystem, IFirewall, IProcessRunner,
-    IRegistry, IScheduler, IServiceControl, ISystemInfo, OsVersion, ProcessOutput, ServiceState,
-    ServiceStatus,
+    IRegistry, IScheduler, IServiceControl, IStartup, ISystemInfo, OsVersion, ProcessOutput,
+    ServiceState, ServiceStatus, StartupEntry, StartupSource,
 };
 pub use catalog::{CatalogError, load_privacy, load_section, load_services};
 pub use engine::{ApplyReport, Engine, FailedAction, PlanError, RevertReport};

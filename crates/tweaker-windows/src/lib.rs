@@ -20,3 +20,4 @@ pub mod registry;
 pub mod scheduler;
 pub mod services;
 pub mod single_instance;
+pub mod startup;

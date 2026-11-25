@@ -252,7 +252,7 @@ mod tests {
     ];
 
     /// Exact number of interface strings shipped in each language.
-    const KEY_COUNT: usize = 275;
+    const KEY_COUNT: usize = 295;
 
     #[test]
     fn both_catalogs_load_and_have_equal_keys() {

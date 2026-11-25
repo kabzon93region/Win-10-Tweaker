@@ -3,7 +3,7 @@
 Навигация по текущему коду. Источник истины — исходники; карта обновляется на каждом этапе,
 где меняются публичные типы, интерфейсы или поток данных.
 
-Актуально для этапа 5, часть 4 (разделы `privacy`, `services`, `ui`, `system`, `context`).
+Актуально для этапа 5, часть 5 (разделы `privacy`, `services`, `ui`, `system`, `context`, `autorun`).
 
 ## Crates
 
@@ -17,9 +17,9 @@
 
 | Файл | Публичные элементы | Роль |
 |---|---|---|
-| `src/action.rs` | `RegistryRoot`, `RegistryKey`, `RegistryValue`, `ServiceStartMode`, `Action` (включая `HostsBlock`, `TaskSetEnabled`, `TaskSetEnabledMatching`, `RegistryDeleteKey`, `FileWriteBytes`, `ProcessRunReversible`), `render_hosts_block`/`strip_hosts_block`/`hosts_block_applied` | Декларативные действия; `Action::describe()` — предпросмотр, `is_reversible()` |
+| `src/action.rs` | `RegistryRoot`, `RegistryKey`, `RegistryValue`, `ServiceStartMode`, `Action` (включая `HostsBlock`, `TaskSetEnabled`, `TaskSetEnabledMatching`, `RegistryDeleteKey`, `FileWriteBytes`, `FileDeleteAny`, `ProcessRunReversible`), `render_hosts_block`/`strip_hosts_block`/`hosts_block_applied` | Декларативные действия; `Action::describe()` — предпросмотр, `is_reversible()` |
 | `src/catalog.rs` | `CatalogError`, `load_privacy`, `load_services`, `load_ui`, `load_system`, `load_context`, `load_section` | Embedded-каталоги `data/tweaks/{privacy,services,ui,system,context}.json`; `load_section` возвращает `None` для инструментов и ещё не заполненных разделов |
-| `src/adapters.rs` | трейты `IRegistry`, `IFileSystem`, `IServiceControl`, `IProcessRunner`, `IFirewall`, `IScheduler`, `IAppx`, `ISystemInfo`; `AdapterError`, `ServiceState`, `ServiceStatus`, `TaskInfo`, `RegistryTree`, `ProcessOutput`, `OsVersion`, `FirewallRule`, `FirewallDirection` | Единственный мост к системе; `IRegistry::read_tree`/`delete_tree` — снимок и удаление ключа с поддеревом; `IFileSystem::read_bytes`/`write_bytes` — бинарные файлы |
+| `src/adapters.rs` | трейты `IRegistry`, `IFileSystem`, `IServiceControl`, `IProcessRunner`, `IFirewall`, `IScheduler`, `IStartup`, `IAppx`, `ISystemInfo`; `AdapterError`, `ServiceState`, `ServiceStatus`, `TaskInfo`, `RegistryTree`, `StartupEntry`, `StartupSource`, `ProcessOutput`, `OsVersion`, `FirewallRule`, `FirewallDirection` | Единственный мост к системе; `IRegistry::read_tree`/`delete_tree` — снимок и удаление ключа с поддеревом; `IFileSystem::read_bytes`/`write_bytes` — бинарные файлы |
 | `src/model.rs` | `RiskLevel`, `TweakDefinition`, `DefinitionError`, `TweakState`, `PlanStep`, `Plan` | Пункт каталога как данные; валидация id/ключей |
 | `src/journal.rs` | `Snapshot` (значение, дерево ключа, текст, бинарный файл, служба, задачи), `Phase`, `JournalRecord`, `AppliedOp`, `Journal` | JSONL-журнал: две фазы, ротация, чтение, поиск неоткаченных и незавершённых операций |
 | `src/engine.rs` | `Engine`, `ApplyReport`, `RevertReport`, `FailedAction`, `PlanError`, помощники `registry_set`, `service_start_mode` | detect/plan/apply/revert/revert_pending; `Engine::new(registry, files, services, processes, scheduler, journal)` |
@@ -37,6 +37,7 @@
 | `src/files.rs` | `WindowsFileSystem` (`IFileSystem`) | UTF-8 текст, создание родительских папок |
 | `src/process.rs` | `SystemProcessRunner` (`IProcessRunner`) | `std::process::Command`, код возврата и вывод |
 | `src/services.rs` | `WindowsServices` (`IServiceControl`) | SCM: состояние, старт/стоп, режим запуска |
+| `src/startup.rs` | `WindowsStartup` (`IStartup`) | Пять источников автозагрузки, чтение `StartupApproved`, открытие расположения |
 | `src/scheduler.rs` | `WindowsScheduler` (`IScheduler`) | `schtasks.exe`: перечисление папки (CSV), состояние из XML, `/Change /ENABLE|/DISABLE`; `CREATE_NO_WINDOW` |
 | `src/single_instance.rs` | `SingleInstance` | Именованный мьютекс `Local\WinTweaker.Instance`: второе окно не открывается; освобождается ядром при завершении |
 | `src/message.rs` | `info(title, text)` | Модальное информационное окно до создания GUI и логгера |
@@ -49,7 +50,7 @@
 | Файл | Элементы | Роль |
 |---|---|---|
 | `src/main.rs` | `Mode`, `parse_args` | `--selftest`, `--smoke`, `--screenshot <png>`, `--section <id>`, `--version`, `--help` |
-| `src/app.rs` | публичные `RunMode`, `install_style`; приватные `TweakerApp` (реализует `eframe::App`), `CatalogView`, `CatalogAction`, `load_catalog`, `select_section`, `save_screenshot` | Окно, меню 14 разделов, универсальный экран каталога (любой раздел с данными), защита от второй копии окна, статус-бар, режим снимка + watchdog |
+| `src/app.rs` | публичные `RunMode`, `install_style`; приватные `TweakerApp` (реализует `eframe::App`), `CatalogView`, `CatalogAction`, `StartupView`, `StartupAction`, `load_catalog`, `select_section`, `save_screenshot` | Окно, меню 14 разделов, универсальный экран каталога, экран автозагрузки с переключением и удалением через движок, защита от второй копии окна, статус-бар, режим снимка + watchdog |
 | `examples/tweak_probe.rs` | `main`, `run` | Живая проба одного пункта каталога вне окна; в релиз не входит |
 | `src/i18n.rs` | `Localizer`, `detect_lang` | ru/en из embedded JSON, форматирование `{placeholders}` |
 | `src/selftest.rs` | `run` | Проверки без окна: пути, лог, локализация, разделы, права, ОС |
@@ -65,6 +66,7 @@
 | `crates/tweaker-core/tests/ui_section.rs` | 17 тестов по пунктам `ui` + проверка обратимости действий |
 | `crates/tweaker-core/tests/system_section.rs` | 18 тестов по пунктам `system` + аргументы команд, недоступность SYS-03/07, обратимость |
 | `crates/tweaker-core/tests/context_section.rs` | 15 тестов по пунктам `context` + проверка обратимости, команд без `%~`, скриптов брандмауэра/ссылок |
+| Автозагрузка | `startup.rs` (5 тестов), `app.rs` (3 теста действий) | пять источников, состояние `StartupApproved`, адреса ключей удаления |
 | `crates/*/src/**` (`#[cfg(test)]`) | Юнит-тесты движка, журнала, логгера, каталога, модели, адаптеров Windows, локализации, CLI-режимов |
 
 ## Поток данных
@@ -94,7 +96,7 @@ TweakDefinition (данные каталога, этап 3)
 
 ## Известные пробелы (на этапе 5, часть 2)
 
-- Каталог: `privacy` 17/17, `services` 24/24, `ui` 17/17, `system` 18/18, `context` 15/17 (CTX-07/08 исключены); `apps`, `autorun` ещё показывают заглушку.
+- Каталог: `privacy` 17/17, `services` 24/24, `ui` 17/17, `system` 18/18, `context` 15/17 (CTX-07/08 исключены); `autorun` — динамический экран на 5 источников; `apps` ещё показывает заглушку.
 - UI-02/12/13 — документированная часть требований (подмена шрифтов, 8 значений, классическое меню), см. D-25.
 - Применение выполняется в UI-потоке: прогресса и отмены нет (дефект D-2 из `TEST_REPORT.md`, этап 6).
 - Незавершённая операция не предлагается к откату при старте (D-8, этап 6).

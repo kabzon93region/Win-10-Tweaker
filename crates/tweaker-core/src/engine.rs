@@ -389,7 +389,9 @@ impl<'a> Engine<'a> {
                 let current = self.files.read_bytes(path).map_err(|error| error.message)?;
                 Ok(current.as_deref() == Some(bytes.as_slice()))
             }
-            Action::FileDelete { path } => Ok(!self.files.exists(path)),
+            Action::FileDelete { path } | Action::FileDeleteAny { path } => {
+                Ok(!self.files.exists(path))
+            }
             Action::ServiceStart { service } => {
                 Ok(self.service_state(service)?.status == ServiceStatus::Running)
             }
@@ -492,7 +494,7 @@ impl<'a> Engine<'a> {
                 let current = self.files.read_text(path).map_err(|error| error.message)?;
                 Ok(Snapshot::TextFile(current))
             }
-            Action::FileWriteBytes { path, .. } => {
+            Action::FileWriteBytes { path, .. } | Action::FileDeleteAny { path } => {
                 let current = self.files.read_bytes(path).map_err(|error| error.message)?;
                 Ok(Snapshot::BinaryFile(current))
             }
@@ -553,7 +555,9 @@ impl<'a> Engine<'a> {
                 .files
                 .write_bytes(path, bytes)
                 .map_err(|error| error.message),
-            Action::FileDelete { path } => self.files.delete(path).map_err(|error| error.message),
+            Action::FileDelete { path } | Action::FileDeleteAny { path } => {
+                self.files.delete(path).map_err(|error| error.message)
+            }
             Action::ServiceStart { service } => {
                 if self.service_state(service)?.status == ServiceStatus::Running {
                     return Ok(());
@@ -662,7 +666,7 @@ impl<'a> Engine<'a> {
                     ))
                 }
             }
-            Action::FileDelete { path } => {
+            Action::FileDelete { path } | Action::FileDeleteAny { path } => {
                 if self.files.exists(path) {
                     Err(format!(
                         "{}: file still exists after delete",
@@ -768,8 +772,10 @@ impl<'a> Engine<'a> {
                     .map_err(|error| error.message),
                 None => self.files.delete(path).map_err(|error| error.message),
             },
-            (Action::FileWriteBytes { path, .. }, Snapshot::BinaryFile(previous)) => match previous
-            {
+            (
+                Action::FileWriteBytes { path, .. } | Action::FileDeleteAny { path },
+                Snapshot::BinaryFile(previous),
+            ) => match previous {
                 Some(bytes) => self
                     .files
                     .write_bytes(path, bytes)
@@ -852,7 +858,10 @@ impl<'a> Engine<'a> {
                     Err(format!("{}: file was not restored", path.display()))
                 }
             }
-            (Action::FileWriteBytes { path, .. }, Snapshot::BinaryFile(previous)) => {
+            (
+                Action::FileWriteBytes { path, .. } | Action::FileDeleteAny { path },
+                Snapshot::BinaryFile(previous),
+            ) => {
                 let current = self.files.read_bytes(path).map_err(|error| error.message)?;
                 if current == *previous {
                     Ok(())
@@ -1706,6 +1715,24 @@ mod tests {
         let revert = engine.revert("PRIV-01");
         assert!(revert.success(), "{revert:?}");
         assert_eq!(harness.files.get_bytes(&path), Some(vec![9, 9]));
+    }
+
+    #[test]
+    fn binary_file_delete_and_revert() {
+        let harness = Harness::new("file-bytes-delete");
+        let path = PathBuf::from(r"C:\Users\Test\Desktop\shortcut.lnk");
+        harness.files.put_bytes(&path, vec![0x4c, 0, 0, 0, 1, 2]);
+        let engine = harness.engine();
+        let definition = tweak(vec![Action::FileDeleteAny { path: path.clone() }]);
+        assert!(engine.apply_tweak(&definition).success());
+        assert_eq!(harness.files.get_bytes(&path), None);
+        assert_eq!(engine.detect(&definition), TweakState::Applied);
+        let revert = engine.revert("PRIV-01");
+        assert!(revert.success(), "{revert:?}");
+        assert_eq!(
+            harness.files.get_bytes(&path),
+            Some(vec![0x4c, 0, 0, 0, 1, 2])
+        );
     }
 
     #[test]
