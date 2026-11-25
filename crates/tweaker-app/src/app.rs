@@ -12,13 +12,14 @@ use eframe::egui;
 use tweaker_core::action::{Action, RegistryKey, RegistryRoot, RegistryValue};
 use tweaker_core::adapters::{IStartup, StartupEntry, StartupSource};
 use tweaker_core::catalog;
-use tweaker_core::engine::Engine;
+use tweaker_core::engine::{ApplyReport, Engine, RevertReport};
 use tweaker_core::journal::Journal;
 use tweaker_core::logging;
 use tweaker_core::model::{RiskLevel, TweakDefinition, TweakState};
 use tweaker_core::paths::ProductPaths;
 use tweaker_core::product::{PRODUCT_DIR_NAME, PRODUCT_VERSION, version_string};
 use tweaker_core::sections::{Section, SectionKind};
+use tweaker_windows::appx::WindowsAppx;
 use tweaker_windows::elevation::{self, ElevationResult};
 use tweaker_windows::files::WindowsFileSystem;
 use tweaker_windows::message;
@@ -291,9 +292,37 @@ struct TweakerApp {
     services: WindowsServices,
     processes: SystemProcessRunner,
     scheduler: WindowsScheduler,
+    appx: WindowsAppx,
     journal: Option<Journal>,
     catalog: CatalogView,
     startup: StartupView,
+    apps: AppsView,
+}
+
+/// One click on the applications screen.
+enum AppsAction {
+    Refresh,
+    AskRemove(Vec<usize>),
+    AskRestore(Vec<usize>),
+    Confirm,
+    Cancel,
+}
+
+/// What the confirmation panel will do.
+#[derive(Clone, Copy)]
+enum AppsPending {
+    Remove,
+    Restore,
+}
+
+/// UI state of the applications section.
+#[derive(Default)]
+struct AppsView {
+    tweaks: Vec<TweakDefinition>,
+    states: Vec<TweakState>,
+    pending: Option<(AppsPending, Vec<usize>)>,
+    report: Option<String>,
+    loaded: bool,
 }
 
 /// UI state of the autorun section.
@@ -427,9 +456,11 @@ impl TweakerApp {
             services: WindowsServices,
             processes: SystemProcessRunner,
             scheduler: WindowsScheduler,
+            appx: WindowsAppx,
             journal,
             catalog,
             startup: StartupView::default(),
+            apps: AppsView::default(),
         }
     }
 
@@ -443,6 +474,11 @@ impl TweakerApp {
         self.startup = StartupView::default();
         if id == "autorun" {
             self.refresh_startup();
+            return;
+        }
+        if id == "apps" {
+            self.apps = AppsView::default();
+            self.refresh_apps();
             return;
         }
         if self.catalog.section == id {
@@ -657,6 +693,8 @@ impl TweakerApp {
                     ui.add_space(10.0);
                     if section.id == "autorun" {
                         self.draw_autorun(ui);
+                    } else if section.id == "apps" {
+                        self.draw_apps(ui);
                     } else if has_catalog {
                         self.draw_catalog(ui);
                     } else {
@@ -896,6 +934,254 @@ impl TweakerApp {
                 .unwrap_or_default();
             self.startup.report = Some(self.loc.fmt("autorun.error", &[("reason", &reason)]));
         }
+    }
+
+    /// Reloads the application list and its states.
+    fn refresh_apps(&mut self) {
+        self.apps.loaded = true;
+        let tweaks = match tweaker_core::catalog::load_apps() {
+            Ok(tweaks) => tweaks,
+            Err(error) => {
+                self.apps.tweaks.clear();
+                self.apps.states.clear();
+                self.apps.report = Some(
+                    self.loc
+                        .fmt("apps.error", &[("reason", &error.to_string())]),
+                );
+                return;
+            }
+        };
+        let Some(journal) = self.journal.as_ref() else {
+            let reason = "the change journal is unavailable".to_owned();
+            self.apps.report = Some(self.loc.fmt("apps.error", &[("reason", &reason)]));
+            return;
+        };
+        let engine = Engine::new(
+            &self.registry,
+            &self.files,
+            &self.services,
+            &self.processes,
+            &self.scheduler,
+            journal,
+        )
+        .with_appx(&self.appx);
+        let states = tweaks.iter().map(|tweak| engine.detect(tweak)).collect();
+        self.apps.tweaks = tweaks;
+        self.apps.states = states;
+    }
+
+    /// Applications screen: a tile per package, removal and restore with confirmation.
+    fn draw_apps(&mut self, ui: &mut egui::Ui) {
+        if !self.apps.loaded {
+            self.refresh_apps();
+        }
+        let loc = &self.loc;
+        let rows: Vec<AppRow> = self
+            .apps
+            .tweaks
+            .iter()
+            .enumerate()
+            .map(|(index, tweak)| {
+                let state = self.apps.states.get(index).cloned().unwrap_or_else(|| {
+                    TweakState::Unavailable {
+                        reason: "state is not detected".to_owned(),
+                    }
+                });
+                let (state_key, color) = app_state_text(&state);
+                AppRow {
+                    title: loc.t(&tweak.title_key),
+                    state: loc.t(state_key),
+                    color,
+                    installed: matches!(state, TweakState::NotApplied),
+                    removed: matches!(state, TweakState::Applied),
+                }
+            })
+            .collect();
+        let installed = apps_with_state(&self.apps.states, true);
+        let removed = apps_with_state(&self.apps.states, false);
+        let mut action: Option<AppsAction> = None;
+
+        ui.horizontal(|ui| {
+            if ui.button(loc.t("apps.refresh")).clicked() {
+                action = Some(AppsAction::Refresh);
+            }
+            if ui.button(loc.t("apps.remove_all")).clicked() {
+                action = Some(AppsAction::AskRemove(installed.clone()));
+            }
+            if ui.button(loc.t("apps.restore_all")).clicked() {
+                action = Some(AppsAction::AskRestore(removed.clone()));
+            }
+            ui.label(loc.fmt("kind.catalog", &[("count", &rows.len().to_string())]));
+        });
+        ui.add_space(8.0);
+        if rows.is_empty() {
+            ui.label(loc.t("apps.empty"));
+        } else {
+            egui::Grid::new("apps_grid")
+                .num_columns(3)
+                .spacing([10.0, 10.0])
+                .show(ui, |ui| {
+                    for (index, row) in rows.iter().enumerate() {
+                        egui::Frame::group(ui.style())
+                            .inner_margin(egui::Margin::same(10))
+                            .show(ui, |ui| {
+                                ui.set_width(248.0);
+                                ui.horizontal(|ui| {
+                                    let letter = row
+                                        .title
+                                        .chars()
+                                        .next()
+                                        .map(|value| value.to_string())
+                                        .unwrap_or_default();
+                                    draw_app_icon(ui, &letter, row.color);
+                                    ui.vertical(|ui| {
+                                        ui.label(
+                                            egui::RichText::new(&row.title).size(14.0).strong(),
+                                        );
+                                        ui.label(
+                                            egui::RichText::new(&row.state)
+                                                .size(12.0)
+                                                .color(row.color),
+                                        );
+                                    });
+                                });
+                                ui.add_space(4.0);
+                                ui.horizontal(|ui| {
+                                    if row.installed && ui.button(loc.t("apps.remove")).clicked() {
+                                        action = Some(AppsAction::AskRemove(vec![index]));
+                                    }
+                                    if row.removed && ui.button(loc.t("apps.restore")).clicked() {
+                                        action = Some(AppsAction::AskRestore(vec![index]));
+                                    }
+                                });
+                            });
+                        if (index + 1) % 3 == 0 {
+                            ui.end_row();
+                        }
+                    }
+                });
+        }
+        if let Some((kind, indices)) = &self.apps.pending {
+            let names = self.app_names(indices);
+            let text = match kind {
+                AppsPending::Remove => loc.fmt("apps.confirm_remove", &[("names", &names)]),
+                AppsPending::Restore => loc.fmt("apps.confirm_restore", &[("names", &names)]),
+            };
+            ui.add_space(10.0);
+            egui::Frame::group(ui.style())
+                .inner_margin(egui::Margin::same(12))
+                .show(ui, |ui| {
+                    ui.label(egui::RichText::new(text).size(13.5));
+                    ui.horizontal(|ui| {
+                        if ui.button(loc.t("apps.confirm_yes")).clicked() {
+                            action = Some(AppsAction::Confirm);
+                        }
+                        if ui.button(loc.t("autorun.cancel")).clicked() {
+                            action = Some(AppsAction::Cancel);
+                        }
+                    });
+                });
+        }
+        if let Some(report) = &self.apps.report {
+            ui.add_space(8.0);
+            ui.label(report);
+        }
+
+        match action {
+            Some(AppsAction::Refresh) => self.refresh_apps(),
+            Some(AppsAction::AskRemove(indices)) => {
+                if indices.is_empty() {
+                    self.apps.report = Some(self.loc.t("apps.none"));
+                } else {
+                    self.apps.pending = Some((AppsPending::Remove, indices));
+                }
+            }
+            Some(AppsAction::AskRestore(indices)) => {
+                if indices.is_empty() {
+                    self.apps.report = Some(self.loc.t("apps.none"));
+                } else {
+                    self.apps.pending = Some((AppsPending::Restore, indices));
+                }
+            }
+            Some(AppsAction::Confirm) => {
+                if let Some((kind, indices)) = self.apps.pending.take() {
+                    self.run_apps(indices, matches!(kind, AppsPending::Remove));
+                }
+            }
+            Some(AppsAction::Cancel) => self.apps.pending = None,
+            None => {}
+        }
+    }
+
+    /// Titles of the pending applications, in list order.
+    fn app_names(&self, indices: &[usize]) -> String {
+        indices
+            .iter()
+            .filter_map(|index| self.apps.tweaks.get(*index))
+            .map(|tweak| self.loc.t(&tweak.title_key))
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
+
+    /// Removes or restores the selected applications, one journaled tweak each.
+    fn run_apps(&mut self, indices: Vec<usize>, remove: bool) {
+        let Some(journal) = self.journal.as_ref() else {
+            let reason = "the change journal is unavailable".to_owned();
+            self.apps.report = Some(self.loc.fmt("apps.error", &[("reason", &reason)]));
+            return;
+        };
+        let mut done = 0usize;
+        let mut failures: Vec<String> = Vec::new();
+        let mut store_hint = false;
+        {
+            let engine = Engine::new(
+                &self.registry,
+                &self.files,
+                &self.services,
+                &self.processes,
+                &self.scheduler,
+                journal,
+            )
+            .with_appx(&self.appx);
+            for index in indices {
+                let Some(tweak) = self.apps.tweaks.get(index) else {
+                    continue;
+                };
+                if remove {
+                    let report = engine.apply_tweak(tweak);
+                    if report.success() {
+                        done += 1;
+                    } else {
+                        failures.push(report_message(&report));
+                    }
+                } else {
+                    let report = engine.revert(&tweak.id);
+                    if !report.success() {
+                        failures.push(revert_message(&report));
+                    } else if report.nothing_to_revert {
+                        store_hint = true;
+                    } else {
+                        done += 1;
+                    }
+                }
+            }
+        }
+        self.refresh_apps();
+        let mut message = if let Some(reason) = failures.first() {
+            self.loc.fmt("apps.error", &[("reason", reason)])
+        } else if done == 0 && store_hint {
+            self.loc.t("apps.store_hint")
+        } else if done == 0 {
+            self.loc.t("apps.none")
+        } else {
+            self.loc
+                .fmt("apps.done_many", &[("count", &done.to_string())])
+        };
+        if store_hint && done > 0 {
+            message.push(' ');
+            message.push_str(&self.loc.t("apps.store_hint"));
+        }
+        self.apps.report = Some(message);
     }
 
     fn draw_catalog(&mut self, ui: &mut egui::Ui) {
@@ -1349,6 +1635,73 @@ impl eframe::App for TweakerApp {
     }
 }
 
+/// One application tile on the applications screen.
+struct AppRow {
+    title: String,
+    state: String,
+    color: egui::Color32,
+    installed: bool,
+    removed: bool,
+}
+
+/// Localized state word and its color for one application tile.
+fn app_state_text(state: &TweakState) -> (&'static str, egui::Color32) {
+    match state {
+        TweakState::Applied => ("apps.removed", egui::Color32::from_gray(120)),
+        TweakState::NotApplied => ("apps.installed", egui::Color32::from_rgb(21, 128, 61)),
+        TweakState::Unavailable { .. } => ("apps.unavailable", egui::Color32::from_rgb(180, 83, 9)),
+    }
+}
+
+/// Indices of installed (`installed = true`) or removed applications.
+fn apps_with_state(states: &[TweakState], installed: bool) -> Vec<usize> {
+    states
+        .iter()
+        .enumerate()
+        .filter(|(_, state)| {
+            if installed {
+                matches!(state, TweakState::NotApplied)
+            } else {
+                matches!(state, TweakState::Applied)
+            }
+        })
+        .map(|(index, _)| index)
+        .collect()
+}
+
+/// Draws a square tile icon with the first letter of the application name.
+fn draw_app_icon(ui: &mut egui::Ui, letter: &str, color: egui::Color32) {
+    let size = egui::vec2(30.0, 30.0);
+    let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
+    ui.painter()
+        .rect_filled(rect, egui::CornerRadius::same(6), color);
+    ui.painter().text(
+        rect.center(),
+        egui::Align2::CENTER_CENTER,
+        letter,
+        egui::FontId::proportional(16.0),
+        egui::Color32::WHITE,
+    );
+}
+
+fn report_message(report: &ApplyReport) -> String {
+    report
+        .failed
+        .first()
+        .map(|failure| failure.error.clone())
+        .or_else(|| report.error.clone())
+        .unwrap_or_else(|| "apply failed".to_owned())
+}
+
+fn revert_message(report: &RevertReport) -> String {
+    report
+        .failed
+        .first()
+        .map(|failure| failure.error.clone())
+        .or_else(|| report.error.clone())
+        .unwrap_or_else(|| "revert failed".to_owned())
+}
+
 /// One click on the autorun screen.
 enum StartupAction {
     Refresh,
@@ -1482,6 +1835,29 @@ mod tests {
             enabled: true,
             location: std::path::PathBuf::from(format!("C:\\{name}.lnk")),
         }
+    }
+
+    #[test]
+    fn app_states_are_split_into_installed_and_removed() {
+        let states = vec![
+            TweakState::NotApplied,
+            TweakState::Applied,
+            TweakState::Unavailable {
+                reason: "no package manager".to_owned(),
+            },
+            TweakState::Applied,
+        ];
+        assert_eq!(apps_with_state(&states, true), vec![0]);
+        assert_eq!(apps_with_state(&states, false), vec![1, 3]);
+        assert_eq!(app_state_text(&TweakState::Applied).0, "apps.removed");
+        assert_eq!(app_state_text(&TweakState::NotApplied).0, "apps.installed");
+        assert_eq!(
+            app_state_text(&TweakState::Unavailable {
+                reason: String::new()
+            })
+            .0,
+            "apps.unavailable"
+        );
     }
 
     #[test]

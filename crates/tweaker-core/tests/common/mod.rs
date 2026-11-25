@@ -14,7 +14,7 @@ use tweaker_core::adapters::{ServiceState, ServiceStatus};
 use tweaker_core::catalog;
 use tweaker_core::engine::Engine;
 use tweaker_core::fake::{
-    FakeFileSystem, FakeProcessRunner, FakeRegistry, FakeScheduler, FakeServiceControl,
+    FakeAppx, FakeFileSystem, FakeProcessRunner, FakeRegistry, FakeScheduler, FakeServiceControl,
 };
 use tweaker_core::journal::{Journal, Phase, Snapshot};
 use tweaker_core::model::{TweakDefinition, TweakState};
@@ -25,6 +25,7 @@ pub struct Harness {
     pub services: FakeServiceControl,
     pub processes: FakeProcessRunner,
     pub scheduler: FakeScheduler,
+    pub appx: FakeAppx,
     pub journal: Journal,
     dir: PathBuf,
 }
@@ -39,6 +40,7 @@ impl Harness {
             services: FakeServiceControl::default(),
             processes: FakeProcessRunner::default(),
             scheduler: FakeScheduler::default(),
+            appx: FakeAppx::default(),
             journal,
             dir,
         }
@@ -53,6 +55,7 @@ impl Harness {
             &self.scheduler,
             &self.journal,
         )
+        .with_appx(&self.appx)
     }
 }
 
@@ -135,6 +138,9 @@ pub fn seed(harness: &Harness, tweaks: &[TweakDefinition]) {
                         }
                     }
                 }
+                Action::AppxRemove { family } => {
+                    harness.appx.add(&format!("{family}_8wekyb3d8bbwe"));
+                }
                 Action::HostsBlock { path, .. } => {
                     harness
                         .files
@@ -207,6 +213,12 @@ pub fn check_item(section_id: &str, id: &str) {
             }
             (Action::FileWrite { .. } | Action::FileDelete { .. }, Snapshot::TextFile(_)) => {}
             (Action::FileWriteBytes { .. }, Snapshot::BinaryFile(None)) => {}
+            (Action::AppxRemove { .. }, Snapshot::Appx(Some(package))) => {
+                assert!(
+                    !package.manifest.as_os_str().is_empty(),
+                    "{id}: manifest path"
+                );
+            }
             (Action::ProcessRun { .. } | Action::ProcessRunReversible { .. }, Snapshot::None) => {}
             other => panic!("{id}: unexpected state before the action: {other:?}"),
         }

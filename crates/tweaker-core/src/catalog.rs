@@ -14,6 +14,7 @@ const SERVICES_JSON: &str = include_str!("../data/tweaks/services.json");
 const UI_JSON: &str = include_str!("../data/tweaks/ui.json");
 const SYSTEM_JSON: &str = include_str!("../data/tweaks/system.json");
 const CONTEXT_JSON: &str = include_str!("../data/tweaks/context.json");
+const APPS_JSON: &str = include_str!("../data/tweaks/apps.json");
 
 /// Problems found while loading the embedded catalog.
 #[derive(Debug)]
@@ -80,6 +81,11 @@ pub fn load_system() -> Result<Vec<TweakDefinition>, CatalogError> {
     load(SYSTEM_JSON, "system")
 }
 
+/// Loads the Store application list.
+pub fn load_apps() -> Result<Vec<TweakDefinition>, CatalogError> {
+    load(APPS_JSON, "apps")
+}
+
 /// Loads a catalog section by its id.
 ///
 /// `Ok(None)` means the section is not a catalog (a tool screen) or its data has
@@ -91,6 +97,7 @@ pub fn load_section(section: &str) -> Result<Option<Vec<TweakDefinition>>, Catal
         "ui" => load_ui().map(Some),
         "system" => load_system().map(Some),
         "context" => load_context().map(Some),
+        "apps" => load_apps().map(Some),
         _ => Ok(None),
     }
 }
@@ -361,6 +368,41 @@ mod tests {
             assert!(!tweak.actions.is_empty(), "{} has no actions", tweak.id);
             assert_eq!(tweak.section, "context");
         }
+    }
+
+    #[test]
+    fn apps_catalog_loads_with_known_ids() {
+        let tweaks = load_apps().expect("catalog must load");
+        assert_eq!(tweaks.len(), 24);
+        assert_eq!(
+            tweaks.first().map(|tweak| tweak.id.as_str()),
+            Some("APP-01")
+        );
+        assert_eq!(tweaks.last().map(|tweak| tweak.id.as_str()), Some("APP-24"));
+        let mut families = HashSet::new();
+        for tweak in &tweaks {
+            assert_eq!(tweak.section, "apps");
+            assert!(tweak.id.starts_with("APP-"), "{}", tweak.id);
+            assert!(!tweak.actions.is_empty(), "{} has no actions", tweak.id);
+            let family = tweak
+                .actions
+                .iter()
+                .find_map(|action| match action {
+                    Action::AppxRemove { family } => Some(family.as_str()),
+                    _ => None,
+                })
+                .expect("appx action");
+            assert!(!family.is_empty(), "{} has an empty family", tweak.id);
+            assert!(families.insert(family), "{family} is used twice");
+        }
+        assert_eq!(
+            tweaks
+                .iter()
+                .filter(|tweak| tweak.risk == RiskLevel::High)
+                .map(|tweak| tweak.id.as_str())
+                .collect::<Vec<_>>(),
+            ["APP-01", "APP-08"]
+        );
     }
 
     #[test]

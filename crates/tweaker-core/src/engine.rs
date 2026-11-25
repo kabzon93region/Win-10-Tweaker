@@ -14,7 +14,7 @@ use crate::action::{
     strip_hosts_block,
 };
 use crate::adapters::{
-    IFileSystem, IProcessRunner, IRegistry, IScheduler, IServiceControl, RegistryTree,
+    IAppx, IFileSystem, IProcessRunner, IRegistry, IScheduler, IServiceControl, RegistryTree,
     ServiceState, ServiceStatus, TaskInfo,
 };
 use crate::journal::{Journal, Snapshot};
@@ -112,6 +112,7 @@ pub struct Engine<'a> {
     services: &'a dyn IServiceControl,
     processes: &'a dyn IProcessRunner,
     scheduler: &'a dyn IScheduler,
+    appx: Option<&'a dyn IAppx>,
     journal: &'a Journal,
 }
 
@@ -132,8 +133,20 @@ impl<'a> Engine<'a> {
             services,
             processes,
             scheduler,
+            appx: None,
             journal,
         }
+    }
+
+    /// Wires the Store package adapter; without it `AppxRemove` is unavailable.
+    pub fn with_appx(mut self, appx: &'a dyn IAppx) -> Self {
+        self.appx = Some(appx);
+        self
+    }
+
+    fn appx(&self) -> Result<&'a dyn IAppx, String> {
+        self.appx
+            .ok_or_else(|| "the Store package adapter is not configured".to_owned())
     }
 
     /// Current state of a tweak.
@@ -435,6 +448,13 @@ impl<'a> Engine<'a> {
                 let tasks = self.matching_tasks(folder, prefixes, *optional)?;
                 Ok(tasks.iter().all(|task| task.enabled == *enabled))
             }
+            Action::AppxRemove { family } => {
+                let installed = self
+                    .appx()?
+                    .installed(family)
+                    .map_err(|error| error.message)?;
+                Ok(!installed)
+            }
         }
     }
 
@@ -530,6 +550,13 @@ impl<'a> Engine<'a> {
             } => Ok(Snapshot::Tasks(
                 self.matching_tasks(folder, prefixes, *optional)?,
             )),
+            Action::AppxRemove { family } => {
+                let package = self
+                    .appx()?
+                    .package(family)
+                    .map_err(|error| error.message)?;
+                Ok(Snapshot::Appx(package))
+            }
         }
     }
 
@@ -608,6 +635,9 @@ impl<'a> Engine<'a> {
                         .map_err(|error| error.message)?;
                 }
                 Ok(())
+            }
+            Action::AppxRemove { family } => {
+                self.appx()?.remove(family).map_err(|error| error.message)
             }
         }
     }
@@ -733,6 +763,17 @@ impl<'a> Engine<'a> {
                     Err(format!("tasks in {folder}: not all tasks were changed"))
                 }
             }
+            Action::AppxRemove { family } => {
+                let installed = self
+                    .appx()?
+                    .installed(family)
+                    .map_err(|error| error.message)?;
+                if installed {
+                    Err(format!("Store package {family} is still installed"))
+                } else {
+                    Ok(())
+                }
+            }
         }
     }
 
@@ -805,6 +846,13 @@ impl<'a> Engine<'a> {
                 }
                 Ok(())
             }
+            (Action::AppxRemove { .. }, Snapshot::Appx(previous)) => match previous {
+                Some(package) => self
+                    .appx()?
+                    .register(&package.manifest)
+                    .map_err(|error| error.message),
+                None => Ok(()),
+            },
             (
                 Action::ProcessRunReversible {
                     revert_program,
@@ -901,6 +949,17 @@ impl<'a> Engine<'a> {
                     }
                 }
                 Ok(())
+            }
+            (Action::AppxRemove { family }, Snapshot::Appx(previous)) => {
+                let installed = self
+                    .appx()?
+                    .installed(family)
+                    .map_err(|error| error.message)?;
+                if installed == previous.is_some() {
+                    Ok(())
+                } else {
+                    Err(format!("Store package {family} was not restored"))
+                }
             }
             (Action::ProcessRunReversible { .. }, _) => Ok(()),
             (Action::ProcessRun { .. }, _) => Err("this action cannot be reverted".to_owned()),
@@ -1009,7 +1068,8 @@ mod tests {
     use crate::action::{RegistryKey, RegistryRoot};
     use crate::adapters::{AdapterError, IRegistry, ProcessOutput, ServiceState, ServiceStatus};
     use crate::fake::{
-        FakeFileSystem, FakeProcessRunner, FakeRegistry, FakeScheduler, FakeServiceControl,
+        FakeAppx, FakeFileSystem, FakeProcessRunner, FakeRegistry, FakeScheduler,
+        FakeServiceControl,
     };
     use crate::model::{RiskLevel, TweakDefinition};
     use crate::test_support::temp_dir;
@@ -1021,6 +1081,7 @@ mod tests {
         services: FakeServiceControl,
         processes: FakeProcessRunner,
         scheduler: FakeScheduler,
+        appx: FakeAppx,
         journal: Journal,
         dir: PathBuf,
     }
@@ -1035,6 +1096,7 @@ mod tests {
                 services: FakeServiceControl::default(),
                 processes: FakeProcessRunner::default(),
                 scheduler: FakeScheduler::default(),
+                appx: FakeAppx::default(),
                 journal,
                 dir,
             }
@@ -1049,6 +1111,7 @@ mod tests {
                 &self.scheduler,
                 &self.journal,
             )
+            .with_appx(&self.appx)
         }
     }
 
@@ -1087,6 +1150,32 @@ mod tests {
         let report = engine.apply_tweak(&definition);
         assert!(report.success(), "{report:?}");
         assert_eq!(engine.detect(&definition), TweakState::Applied);
+    }
+
+    #[test]
+    fn appx_remove_and_register_round_trip() {
+        let harness = Harness::new("appx");
+        let family = "Microsoft.WindowsStore_8wekyb3d8bbwe";
+        harness.appx.add(family);
+        let engine = harness.engine();
+        let definition = tweak(vec![Action::AppxRemove {
+            family: "Microsoft.WindowsStore".to_owned(),
+        }]);
+        assert_eq!(engine.detect(&definition), TweakState::NotApplied);
+        let report = engine.apply_tweak(&definition);
+        assert!(report.success(), "{report:?}");
+        assert_eq!(engine.detect(&definition), TweakState::Applied);
+        assert!(!harness.appx.installed(family).expect("installed"));
+
+        let report = engine.revert("PRIV-01");
+        assert!(report.success(), "{report:?}");
+        assert_eq!(engine.detect(&definition), TweakState::NotApplied);
+        let manifest = PathBuf::from(format!(r"C:\Apps\{family}\AppxManifest.xml"));
+        assert!(
+            harness.appx.was_registered(&manifest),
+            "{:?}",
+            harness.appx.registered.borrow()
+        );
     }
 
     #[test]

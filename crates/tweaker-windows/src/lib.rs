@@ -10,6 +10,7 @@
 #[cfg(not(windows))]
 compile_error!("tweaker-windows supports Windows only");
 
+pub mod appx;
 pub mod elevation;
 pub mod files;
 pub mod locale;

@@ -262,12 +262,27 @@ pub trait IScheduler {
     fn set_enabled(&self, task_path: &str, enabled: bool) -> Result<(), AdapterError>;
 }
 
+/// An installed Store package, enough to remove and restore it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AppxPackage {
+    /// Package family name, e.g. `Microsoft.WindowsStore_8wekyb3d8bbwe`.
+    pub family: String,
+    /// Full package name used by the removal API.
+    pub full_name: String,
+    /// Path to `AppxManifest.xml` inside the installed location.
+    pub manifest: PathBuf,
+}
+
 /// Microsoft Store packages.
 pub trait IAppx {
-    /// Whether a package with this family name is installed for the user.
+    /// Whether a package matching this family token is installed for the user.
     fn installed(&self, package_family: &str) -> Result<bool, AdapterError>;
+    /// Package details; `Ok(None)` when no package matches the token.
+    fn package(&self, package_family: &str) -> Result<Option<AppxPackage>, AdapterError>;
     /// Removes a package for the current user.
     fn remove(&self, package_family: &str) -> Result<(), AdapterError>;
+    /// Registers an existing package manifest for the current user.
+    fn register(&self, manifest: &Path) -> Result<(), AdapterError>;
 }
 
 /// Read-only information about the operating system.

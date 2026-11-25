@@ -295,6 +295,14 @@ pub enum Action {
         #[serde(default)]
         optional: bool,
     },
+    /// Remove one Store package for the current user.
+    ///
+    /// The snapshot keeps the package family name and the manifest path, so the
+    /// revert can register the package again while its files are still on disk.
+    AppxRemove {
+        /// Family name or a distinctive part of it, e.g. `Microsoft.WindowsStore`.
+        family: String,
+    },
 }
 
 /// First line of the managed hosts block.
@@ -448,6 +456,7 @@ impl Action {
                     )
                 }
             }
+            Action::AppxRemove { family } => format!("remove Store package {family}"),
         }
     }
 

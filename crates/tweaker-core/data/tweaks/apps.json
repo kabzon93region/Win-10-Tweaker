@@ -1,0 +1,266 @@
+[
+  {
+    "id": "APP-01",
+    "section": "apps",
+    "titleKey": "tweak.APP-01.title",
+    "descriptionKey": "tweak.APP.description",
+    "risk": "high",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "appx_remove", "family": "Microsoft.WindowsStore" }
+    ]
+  },
+  {
+    "id": "APP-02",
+    "section": "apps",
+    "titleKey": "tweak.APP-02.title",
+    "descriptionKey": "tweak.APP.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "appx_remove", "family": "Microsoft.Windows.Photos" }
+    ]
+  },
+  {
+    "id": "APP-03",
+    "section": "apps",
+    "titleKey": "tweak.APP-03.title",
+    "descriptionKey": "tweak.APP.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "appx_remove", "family": "Microsoft.MicrosoftSolitaireCollection" }
+    ]
+  },
+  {
+    "id": "APP-04",
+    "section": "apps",
+    "titleKey": "tweak.APP-04.title",
+    "descriptionKey": "tweak.APP.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "appx_remove", "family": "Microsoft.Office.OneNote" }
+    ]
+  },
+  {
+    "id": "APP-05",
+    "section": "apps",
+    "titleKey": "tweak.APP-05.title",
+    "descriptionKey": "tweak.APP.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "appx_remove", "family": "Microsoft.MSPaint" }
+    ]
+  },
+  {
+    "id": "APP-06",
+    "section": "apps",
+    "titleKey": "tweak.APP-06.title",
+    "descriptionKey": "tweak.APP.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "appx_remove", "family": "Microsoft.Microsoft3DViewer" }
+    ]
+  },
+  {
+    "id": "APP-07",
+    "section": "apps",
+    "titleKey": "tweak.APP-07.title",
+    "descriptionKey": "tweak.APP.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "appx_remove", "family": "Microsoft.MicrosoftStickyNotes" }
+    ]
+  },
+  {
+    "id": "APP-08",
+    "section": "apps",
+    "titleKey": "tweak.APP-08.title",
+    "descriptionKey": "tweak.APP.description",
+    "risk": "high",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "appx_remove", "family": "Microsoft.XboxApp" }
+    ]
+  },
+  {
+    "id": "APP-09",
+    "section": "apps",
+    "titleKey": "tweak.APP-09.title",
+    "descriptionKey": "tweak.APP.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "appx_remove", "family": "Microsoft.WindowsAlarms" }
+    ]
+  },
+  {
+    "id": "APP-10",
+    "section": "apps",
+    "titleKey": "tweak.APP-10.title",
+    "descriptionKey": "tweak.APP.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "appx_remove", "family": "Microsoft.WindowsSoundRecorder" }
+    ]
+  },
+  {
+    "id": "APP-11",
+    "section": "apps",
+    "titleKey": "tweak.APP-11.title",
+    "descriptionKey": "tweak.APP.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "appx_remove", "family": "Microsoft.WindowsCamera" }
+    ]
+  },
+  {
+    "id": "APP-12",
+    "section": "apps",
+    "titleKey": "tweak.APP-12.title",
+    "descriptionKey": "tweak.APP.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "appx_remove", "family": "Microsoft.WindowsMaps" }
+    ]
+  },
+  {
+    "id": "APP-13",
+    "section": "apps",
+    "titleKey": "tweak.APP-13.title",
+    "descriptionKey": "tweak.APP.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "appx_remove", "family": "Microsoft.ZuneMusic" }
+    ]
+  },
+  {
+    "id": "APP-14",
+    "section": "apps",
+    "titleKey": "tweak.APP-14.title",
+    "descriptionKey": "tweak.APP.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "appx_remove", "family": "Microsoft.People" }
+    ]
+  },
+  {
+    "id": "APP-15",
+    "section": "apps",
+    "titleKey": "tweak.APP-15.title",
+    "descriptionKey": "tweak.APP.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "appx_remove", "family": "Microsoft.Music" }
+    ]
+  },
+  {
+    "id": "APP-16",
+    "section": "apps",
+    "titleKey": "tweak.APP-16.title",
+    "descriptionKey": "tweak.APP.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "appx_remove", "family": "Microsoft.OneConnect" }
+    ]
+  },
+  {
+    "id": "APP-17",
+    "section": "apps",
+    "titleKey": "tweak.APP-17.title",
+    "descriptionKey": "tweak.APP.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "appx_remove", "family": "Microsoft.BingWeather" }
+    ]
+  },
+  {
+    "id": "APP-18",
+    "section": "apps",
+    "titleKey": "tweak.APP-18.title",
+    "descriptionKey": "tweak.APP.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "appx_remove", "family": "Microsoft.GetHelp" }
+    ]
+  },
+  {
+    "id": "APP-19",
+    "section": "apps",
+    "titleKey": "tweak.APP-19.title",
+    "descriptionKey": "tweak.APP.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "appx_remove", "family": "Microsoft.WindowsCommunicationsApps" }
+    ]
+  },
+  {
+    "id": "APP-20",
+    "section": "apps",
+    "titleKey": "tweak.APP-20.title",
+    "descriptionKey": "tweak.APP.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "appx_remove", "family": "Microsoft.SkypeApp" }
+    ]
+  },
+  {
+    "id": "APP-21",
+    "section": "apps",
+    "titleKey": "tweak.APP-21.title",
+    "descriptionKey": "tweak.APP.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "appx_remove", "family": "Microsoft.Getstarted" }
+    ]
+  },
+  {
+    "id": "APP-22",
+    "section": "apps",
+    "titleKey": "tweak.APP-22.title",
+    "descriptionKey": "tweak.APP.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "appx_remove", "family": "Microsoft.Messaging" }
+    ]
+  },
+  {
+    "id": "APP-23",
+    "section": "apps",
+    "titleKey": "tweak.APP-23.title",
+    "descriptionKey": "tweak.APP.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "appx_remove", "family": "Microsoft.MicrosoftOfficeHub" }
+    ]
+  },
+  {
+    "id": "APP-24",
+    "section": "apps",
+    "titleKey": "tweak.APP-24.title",
+    "descriptionKey": "tweak.APP.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "appx_remove", "family": "Microsoft.WindowsFeedbackHub" }
+    ]
+  }
+]

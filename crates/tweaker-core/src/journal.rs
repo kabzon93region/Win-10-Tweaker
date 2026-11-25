@@ -15,7 +15,7 @@ use chrono::{SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::action::{Action, RegistryValue};
-use crate::adapters::{RegistryTree, ServiceState, TaskInfo};
+use crate::adapters::{AppxPackage, RegistryTree, ServiceState, TaskInfo};
 use crate::logging;
 
 /// Name of the active journal file.
@@ -40,6 +40,8 @@ pub enum Snapshot {
     Service(Option<ServiceState>),
     /// Scheduled tasks and their enabled state.
     Tasks(Vec<TaskInfo>),
+    /// Store package; `None` means it was not installed.
+    Appx(Option<AppxPackage>),
     /// Nothing to restore (irreversible action).
     None,
 }

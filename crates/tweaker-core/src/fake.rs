@@ -10,9 +10,9 @@ use std::path::{Path, PathBuf};
 
 use crate::action::{RegistryKey, RegistryValue, ServiceStartMode};
 use crate::adapters::{
-    AdapterError, FirewallRule, IAppx, IFileSystem, IFirewall, IProcessRunner, IRegistry,
-    IScheduler, IServiceControl, ISystemInfo, OsVersion, ProcessOutput, RegistryTree, ServiceState,
-    ServiceStatus,
+    AdapterError, AppxPackage, FirewallRule, IAppx, IFileSystem, IFirewall, IProcessRunner,
+    IRegistry, IScheduler, IServiceControl, ISystemInfo, OsVersion, ProcessOutput, RegistryTree,
+    ServiceState, ServiceStatus,
 };
 
 fn failure(message: &str) -> AdapterError {
@@ -421,23 +421,88 @@ impl IScheduler for FakeScheduler {
 /// In-memory Store packages.
 #[derive(Default)]
 pub struct FakeAppx {
-    installed: RefCell<HashSet<String>>,
+    packages: RefCell<HashMap<String, AppxPackage>>,
+    /// When set, every removal fails with this text.
+    pub fail_remove: RefCell<Option<String>>,
+    /// Manifests passed to `register`, in order.
+    pub registered: RefCell<Vec<PathBuf>>,
 }
 
 impl FakeAppx {
-    /// Preloads an installed package family.
+    /// Preloads an installed package family with a conventional manifest path.
     pub fn add(&self, family: &str) {
-        self.installed.borrow_mut().insert(family.to_owned());
+        let manifest = PathBuf::from(format!(r"C:\Apps\{family}\AppxManifest.xml"));
+        self.packages.borrow_mut().insert(
+            family.to_owned(),
+            AppxPackage {
+                family: family.to_owned(),
+                full_name: format!("{family}_1.0.0.0_x64__test"),
+                manifest,
+            },
+        );
+    }
+
+    /// Preloads a package with an explicit manifest path.
+    pub fn add_package(&self, package: AppxPackage) {
+        self.packages
+            .borrow_mut()
+            .insert(package.family.clone(), package);
+    }
+
+    /// Whether `register` was called with this manifest.
+    pub fn was_registered(&self, manifest: &Path) -> bool {
+        self.registered.borrow().iter().any(|path| path == manifest)
+    }
+
+    fn find(&self, package_family: &str) -> Option<(String, AppxPackage)> {
+        let token = package_family.to_lowercase();
+        self.packages
+            .borrow()
+            .iter()
+            .find(|(family, _)| family.to_lowercase().contains(&token))
+            .map(|(family, package)| (family.clone(), package.clone()))
     }
 }
 
 impl IAppx for FakeAppx {
     fn installed(&self, package_family: &str) -> Result<bool, AdapterError> {
-        Ok(self.installed.borrow().contains(package_family))
+        Ok(self.find(package_family).is_some())
+    }
+
+    fn package(&self, package_family: &str) -> Result<Option<AppxPackage>, AdapterError> {
+        Ok(self.find(package_family).map(|(_, package)| package))
     }
 
     fn remove(&self, package_family: &str) -> Result<(), AdapterError> {
-        self.installed.borrow_mut().remove(package_family);
+        if let Some(reason) = self.fail_remove.borrow().as_deref() {
+            return Err(failure(reason));
+        }
+        match self.find(package_family) {
+            Some((family, _)) => {
+                self.packages.borrow_mut().remove(&family);
+                Ok(())
+            }
+            None => Err(failure(&format!(
+                "package {package_family} is not installed"
+            ))),
+        }
+    }
+
+    fn register(&self, manifest: &Path) -> Result<(), AdapterError> {
+        self.registered.borrow_mut().push(manifest.to_path_buf());
+        let family = manifest
+            .parent()
+            .and_then(|parent| parent.file_name())
+            .map(|name| name.to_string_lossy().to_string())
+            .unwrap_or_else(|| "restored.package".to_owned());
+        self.packages.borrow_mut().insert(
+            family.clone(),
+            AppxPackage {
+                family: family.clone(),
+                full_name: format!("{family}_1.0.0.0_x64__restored"),
+                manifest: manifest.to_path_buf(),
+            },
+        );
         Ok(())
     }
 }
