@@ -9,7 +9,7 @@
 | Этап | 5 — остальные разделы: части 1–4 (`services` 24/24, `ui` 17/17, `system` 18/18, `context` 15/17); дальше `autorun`, `apps` |
 | Код | `Cargo.toml`, `crates/tweaker-core`, `crates/tweaker-windows`, `crates/tweaker-app` |
 | Версия | 0.1.0 |
-| Git | `2e8c40f` (этап 5, часть 3); часть 4 — коммит после аудита |
+| Git | `ce6829f` (этап 5, часть 4); часть 3 — `4e21c1d` |
 | Сборка | `cargo build --workspace` — успешно; `cargo build --release -p tweaker-app` — успешно |
 | Артефакт | `target/release/wintweaker.exe` — 7 068 160 байт, sha256 `BBB4121F934BAE69C22331E4472BE01A83750F96A5C4B93214888EC777F56EC2` |
 | Тесты | `cargo test --workspace` — 249 passed, 1 ignored (app 20, core 97, core-tests 21+26+18+22+18, windows 27) |
