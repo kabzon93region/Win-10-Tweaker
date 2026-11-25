@@ -73,7 +73,10 @@ struct ScreenshotState {
 }
 
 /// Starts the application.
-pub fn run(mode: RunMode) -> Result<u8, String> {
+///
+/// `section` opens a specific section by id (used by `--section` for screenshots
+/// and manual checks); `None` opens the first section.
+pub fn run(mode: RunMode, section: Option<String>, args: &[String]) -> Result<u8, String> {
     let paths = ProductPaths::for_current_user()
         .map_err(|error| format!("cannot resolve product paths: {error}"))?;
     paths.ensure_runtime_dirs().map_err(|error| {
@@ -94,6 +97,17 @@ pub fn run(mode: RunMode) -> Result<u8, String> {
     let loc = Localizer::load(i18n::detect_lang());
     logger.info(&format!("language: {}", loc.lang().code()));
 
+    // Section ids are validated before the optional elevation restart: the new
+    // process receives the same arguments, and an unknown id must fail either way.
+    let sections = tweaker_core::sections::load_sections()
+        .map_err(|error| format!("cannot load section catalog: {error}"))?;
+    logger.info(&format!("sections: {}", sections.len()));
+    if let Some(id) = section.as_deref()
+        && !sections.iter().any(|candidate| candidate.id == id)
+    {
+        return Err(format!("unknown section: {id}"));
+    }
+
     if mode.automated() {
         if !elevation::is_elevated() {
             logger.warn(
@@ -105,6 +119,7 @@ pub fn run(mode: RunMode) -> Result<u8, String> {
             &loc.t("elevation.title"),
             &loc.t("elevation.body"),
             &loc.t("elevation.failed"),
+            args,
         );
         match result {
             ElevationResult::AlreadyElevated => {}
@@ -142,11 +157,7 @@ pub fn run(mode: RunMode) -> Result<u8, String> {
         None
     };
 
-    let sections = tweaker_core::sections::load_sections()
-        .map_err(|error| format!("cannot load section catalog: {error}"))?;
-    logger.info(&format!("sections: {}", sections.len()));
-
-    run_window(loc, paths, sections, mode)
+    run_window(loc, paths, sections, mode, section)
 }
 
 /// Name of the session-local mutex that marks a running window.
@@ -159,6 +170,7 @@ fn run_window(
     paths: ProductPaths,
     sections: Vec<Section>,
     mode: RunMode,
+    initial_section: Option<String>,
 ) -> Result<u8, String> {
     let admin = elevation::is_elevated();
     let title = loc.t("app.window");
@@ -177,7 +189,15 @@ fn run_window(
         options,
         Box::new(move |cc| {
             install_style(&cc.egui_ctx);
-            let app = TweakerApp::new(loc, paths, sections, admin, mode, app_state);
+            let app = TweakerApp::new(
+                loc,
+                paths,
+                sections,
+                admin,
+                mode,
+                initial_section,
+                app_state,
+            );
             app.start_watchdog(&cc.egui_ctx);
             Ok(Box::new(app))
         }),
@@ -269,12 +289,14 @@ struct TweakerApp {
     processes: SystemProcessRunner,
     scheduler: WindowsScheduler,
     journal: Option<Journal>,
-    privacy: PrivacyView,
+    catalog: CatalogView,
 }
 
-/// UI state of the privacy section.
+/// UI state of one catalog section.
 #[derive(Default)]
-struct PrivacyView {
+struct CatalogView {
+    /// Section id whose data is loaded; empty until the first selection.
+    section: String,
     tweaks: Vec<TweakDefinition>,
     selected: Vec<bool>,
     states: Vec<TweakState>,
@@ -283,8 +305,8 @@ struct PrivacyView {
     report: Option<Vec<String>>,
 }
 
-/// One click on the privacy screen.
-enum PrivacyAction {
+/// One click on a catalog screen.
+enum CatalogAction {
     Refresh,
     BuildPreview,
     Confirm,
@@ -294,7 +316,7 @@ enum PrivacyAction {
 }
 
 /// One precomputed row of the privacy list.
-struct PrivacyRow {
+struct CatalogRow {
     title: String,
     description: String,
     risk: String,
@@ -304,7 +326,37 @@ struct PrivacyRow {
     reboot: bool,
 }
 
-fn privacy_state_text(loc: &Localizer, state: &TweakState) -> (String, egui::Color32) {
+/// Loads the catalog of the section stored in `view.section`.
+///
+/// Unknown sections (tools, or data not added yet) keep the list empty so the
+/// screen falls back to the placeholder.
+fn load_catalog(view: &mut CatalogView) {
+    match catalog::load_section(&view.section) {
+        Ok(Some(tweaks)) => {
+            logging::info(&format!(
+                "catalog: {} items in {}",
+                tweaks.len(),
+                view.section
+            ));
+            view.selected = vec![false; tweaks.len()];
+            view.states.clear();
+            view.tweaks = tweaks;
+        }
+        Ok(None) => {
+            view.selected.clear();
+            view.states.clear();
+            view.tweaks.clear();
+        }
+        Err(error) => {
+            logging::error(&format!("catalog: cannot load {}: {error}", view.section));
+            view.selected.clear();
+            view.states.clear();
+            view.tweaks.clear();
+        }
+    }
+}
+
+fn catalog_state_text(loc: &Localizer, state: &TweakState) -> (String, egui::Color32) {
     match state {
         TweakState::Applied => (
             loc.t("privacy.applied"),
@@ -325,18 +377,18 @@ impl TweakerApp {
         sections: Vec<Section>,
         admin: bool,
         mode: RunMode,
+        initial_section: Option<String>,
         screenshot_state: Arc<ScreenshotState>,
     ) -> Self {
-        let (tweaks, selected) = match catalog::load_privacy() {
-            Ok(tweaks) => {
-                let count = tweaks.len();
-                (tweaks, vec![false; count])
-            }
-            Err(error) => {
-                logging::error(&format!("catalog: cannot load privacy: {error}"));
-                (Vec::new(), Vec::new())
-            }
+        let selected = initial_section
+            .as_deref()
+            .and_then(|id| sections.iter().position(|section| section.id == id))
+            .unwrap_or(0);
+        let mut catalog = CatalogView {
+            section: sections[selected].id.clone(),
+            ..CatalogView::default()
         };
+        load_catalog(&mut catalog);
         let journal = match Journal::new(paths.journal()) {
             Ok(journal) => Some(journal),
             Err(error) => {
@@ -347,7 +399,7 @@ impl TweakerApp {
         Self {
             loc,
             sections,
-            selected: 0,
+            selected,
             admin,
             mode,
             started: Instant::now(),
@@ -362,12 +414,25 @@ impl TweakerApp {
             processes: SystemProcessRunner,
             scheduler: WindowsScheduler,
             journal,
-            privacy: PrivacyView {
-                tweaks,
-                selected,
-                ..PrivacyView::default()
-            },
+            catalog,
         }
+    }
+
+    /// Switches the visible section and loads its catalog data when needed.
+    fn select_section(&mut self, index: usize) {
+        if index == self.selected {
+            return;
+        }
+        self.selected = index;
+        let id = self.sections[index].id.clone();
+        if self.catalog.section == id {
+            return;
+        }
+        self.catalog = CatalogView {
+            section: id,
+            ..CatalogView::default()
+        };
+        load_catalog(&mut self.catalog);
     }
 
     /// In `--screenshot` mode, closes the window and records a timeout if the
@@ -504,7 +569,9 @@ impl TweakerApp {
                         }
                     });
             });
-        self.selected = selected;
+        if selected != self.selected {
+            self.select_section(selected);
+        }
     }
 
     fn draw_central(&mut self, ui: &mut egui::Ui) {
@@ -520,7 +587,7 @@ impl TweakerApp {
         let placeholder_title = self.loc.t("placeholder.title");
         let placeholder_body = self.loc.t("placeholder.body");
         let is_about = section.id == "about";
-        let is_privacy = section.id == "privacy";
+        let has_catalog = self.catalog.section == section.id && !self.catalog.tweaks.is_empty();
         let about_lines = if is_about {
             self.about_lines()
         } else {
@@ -543,8 +610,8 @@ impl TweakerApp {
                     ui.add_space(10.0);
                     ui.separator();
                     ui.add_space(10.0);
-                    if is_privacy {
-                        self.draw_privacy(ui);
+                    if has_catalog {
+                        self.draw_catalog(ui);
                     } else {
                         ui.label(egui::RichText::new(kind_text).size(13.0));
                         ui.add_space(14.0);
@@ -574,19 +641,19 @@ impl TweakerApp {
         });
     }
 
-    fn draw_privacy(&mut self, ui: &mut egui::Ui) {
-        if self.privacy.states.len() != self.privacy.tweaks.len() {
-            self.refresh_privacy_states();
+    fn draw_catalog(&mut self, ui: &mut egui::Ui) {
+        if self.catalog.states.len() != self.catalog.tweaks.len() {
+            self.refresh_catalog_states();
         }
         let loc = &self.loc;
-        let mut rows = Vec::with_capacity(self.privacy.tweaks.len());
-        for (index, tweak) in self.privacy.tweaks.iter().enumerate() {
-            let state = self.privacy.states.get(index).cloned().unwrap_or_else(|| {
+        let mut rows = Vec::with_capacity(self.catalog.tweaks.len());
+        for (index, tweak) in self.catalog.tweaks.iter().enumerate() {
+            let state = self.catalog.states.get(index).cloned().unwrap_or_else(|| {
                 TweakState::Unavailable {
                     reason: "state is not detected".to_owned(),
                 }
             });
-            let (state_text, state_color) = privacy_state_text(loc, &state);
+            let (state_text, state_color) = catalog_state_text(loc, &state);
             let risk_text = loc.t(&format!("privacy.risk.{}", tweak.risk.label()));
             let risk_color = match tweak.risk {
                 RiskLevel::Low => egui::Color32::from_rgb(21, 128, 61),
@@ -594,7 +661,7 @@ impl TweakerApp {
                 RiskLevel::High => egui::Color32::from_rgb(180, 83, 9),
                 RiskLevel::Critical => egui::Color32::from_rgb(185, 28, 28),
             };
-            rows.push(PrivacyRow {
+            rows.push(CatalogRow {
                 title: loc.t(&tweak.title_key),
                 description: loc.t(&tweak.description_key),
                 risk: risk_text,
@@ -604,11 +671,11 @@ impl TweakerApp {
                 reboot: tweak.requires_reboot,
             });
         }
-        let mut selected = self.privacy.selected.clone();
-        let mut action: Option<PrivacyAction> = None;
+        let mut selected = self.catalog.selected.clone();
+        let mut action: Option<CatalogAction> = None;
         let selected_count = selected.iter().filter(|value| **value).count();
         let risky_selected = self
-            .privacy
+            .catalog
             .tweaks
             .iter()
             .enumerate()
@@ -618,13 +685,13 @@ impl TweakerApp {
 
         ui.horizontal(|ui| {
             if ui.button(loc.t("privacy.reload")).clicked() {
-                action = Some(PrivacyAction::Refresh);
+                action = Some(CatalogAction::Refresh);
             }
             if ui.button(loc.t("privacy.apply")).clicked() {
-                action = Some(PrivacyAction::BuildPreview);
+                action = Some(CatalogAction::BuildPreview);
             }
             if ui.button(loc.t("privacy.revert")).clicked() {
-                action = Some(PrivacyAction::Revert);
+                action = Some(CatalogAction::Revert);
             }
             ui.label(loc.fmt(
                 "privacy.selected",
@@ -669,7 +736,7 @@ impl TweakerApp {
             .on_hover_text(&row.description);
         }
 
-        if !self.privacy.preview.is_empty() {
+        if !self.catalog.preview.is_empty() {
             ui.add_space(12.0);
             egui::Frame::group(ui.style())
                 .inner_margin(egui::Margin::same(12))
@@ -680,7 +747,7 @@ impl TweakerApp {
                             .strong(),
                     );
                     ui.add_space(4.0);
-                    for line in &self.privacy.preview {
+                    for line in &self.catalog.preview {
                         ui.label(line);
                     }
                     if risky_selected {
@@ -693,16 +760,16 @@ impl TweakerApp {
                     ui.add_space(6.0);
                     ui.horizontal(|ui| {
                         if ui.button(loc.t("privacy.confirm")).clicked() {
-                            action = Some(PrivacyAction::Confirm);
+                            action = Some(CatalogAction::Confirm);
                         }
                         if ui.button(loc.t("privacy.cancel")).clicked() {
-                            action = Some(PrivacyAction::Cancel);
+                            action = Some(CatalogAction::Cancel);
                         }
                     });
                 });
         }
 
-        if let Some(report) = &self.privacy.report {
+        if let Some(report) = &self.catalog.report {
             ui.add_space(12.0);
             egui::Frame::group(ui.style())
                 .inner_margin(egui::Margin::same(12))
@@ -718,24 +785,24 @@ impl TweakerApp {
                     }
                     ui.add_space(6.0);
                     if ui.button(loc.t("privacy.done")).clicked() {
-                        action = Some(PrivacyAction::ClearReport);
+                        action = Some(CatalogAction::ClearReport);
                     }
                 });
         }
 
-        if selected != self.privacy.selected {
-            self.privacy.selected = selected;
+        if selected != self.catalog.selected {
+            self.catalog.selected = selected;
         }
         match action {
-            Some(PrivacyAction::Refresh) => self.refresh_privacy_states(),
-            Some(PrivacyAction::BuildPreview) => self.build_privacy_preview(),
-            Some(PrivacyAction::Confirm) => self.confirm_privacy(),
-            Some(PrivacyAction::Cancel) => {
-                self.privacy.preview.clear();
-                self.privacy.pending.clear();
+            Some(CatalogAction::Refresh) => self.refresh_catalog_states(),
+            Some(CatalogAction::BuildPreview) => self.build_catalog_preview(),
+            Some(CatalogAction::Confirm) => self.confirm_catalog(),
+            Some(CatalogAction::Cancel) => {
+                self.catalog.preview.clear();
+                self.catalog.pending.clear();
             }
-            Some(PrivacyAction::Revert) => self.revert_privacy(),
-            Some(PrivacyAction::ClearReport) => self.privacy.report = None,
+            Some(CatalogAction::Revert) => self.revert_catalog(),
+            Some(CatalogAction::ClearReport) => self.catalog.report = None,
             None => {}
         }
     }
@@ -747,7 +814,7 @@ impl TweakerApp {
     fn detect_privacy(&self) -> Vec<TweakState> {
         if !self.engine_ready() {
             return self
-                .privacy
+                .catalog
                 .tweaks
                 .iter()
                 .map(|_| TweakState::Unavailable {
@@ -764,36 +831,36 @@ impl TweakerApp {
             &self.scheduler,
             journal,
         );
-        self.privacy
+        self.catalog
             .tweaks
             .iter()
             .map(|tweak| engine.detect(tweak))
             .collect()
     }
 
-    fn refresh_privacy_states(&mut self) {
-        self.privacy.states = self.detect_privacy();
+    fn refresh_catalog_states(&mut self) {
+        self.catalog.states = self.detect_privacy();
     }
 
     fn selected_tweaks(&self) -> Vec<TweakDefinition> {
-        self.privacy
+        self.catalog
             .tweaks
             .iter()
             .enumerate()
-            .filter(|(index, _)| self.privacy.selected.get(*index).copied().unwrap_or(false))
+            .filter(|(index, _)| self.catalog.selected.get(*index).copied().unwrap_or(false))
             .map(|(_, tweak)| tweak.clone())
             .collect()
     }
 
-    fn build_privacy_preview(&mut self) {
+    fn build_catalog_preview(&mut self) {
         let tweaks = self.selected_tweaks();
         if tweaks.is_empty() {
-            self.privacy.report = Some(vec![self.loc.t("privacy.no_selection")]);
+            self.catalog.report = Some(vec![self.loc.t("privacy.no_selection")]);
             return;
         }
         if !self.engine_ready() {
             let reason = "the change journal is unavailable".to_owned();
-            self.privacy.report = Some(vec![
+            self.catalog.report = Some(vec![
                 self.loc
                     .fmt("privacy.journal_missing", &[("reason", &reason)]),
             ]);
@@ -830,24 +897,24 @@ impl TweakerApp {
                 )),
             }
         }
-        self.privacy.preview = lines;
-        self.privacy.pending = ids;
-        self.privacy.report = None;
+        self.catalog.preview = lines;
+        self.catalog.pending = ids;
+        self.catalog.report = None;
     }
 
-    fn confirm_privacy(&mut self) {
-        let ids = std::mem::take(&mut self.privacy.pending);
+    fn confirm_catalog(&mut self) {
+        let ids = std::mem::take(&mut self.catalog.pending);
         if ids.is_empty() {
-            self.privacy.preview.clear();
+            self.catalog.preview.clear();
             return;
         }
         if !self.engine_ready() {
             let reason = "the change journal is unavailable".to_owned();
-            self.privacy.report = Some(vec![
+            self.catalog.report = Some(vec![
                 self.loc
                     .fmt("privacy.journal_missing", &[("reason", &reason)]),
             ]);
-            self.privacy.preview.clear();
+            self.catalog.preview.clear();
             return;
         }
         let journal = self.journal.as_ref().expect("checked above");
@@ -861,7 +928,7 @@ impl TweakerApp {
         );
         let mut lines = Vec::new();
         for id in &ids {
-            let Some(tweak) = self.privacy.tweaks.iter().find(|tweak| &tweak.id == id) else {
+            let Some(tweak) = self.catalog.tweaks.iter().find(|tweak| &tweak.id == id) else {
                 continue;
             };
             let title = self.loc.t(&tweak.title_key);
@@ -883,24 +950,24 @@ impl TweakerApp {
                 lines.push(format!("  • {}", failure.error));
             }
         }
-        self.privacy.preview.clear();
-        self.privacy.report = Some(lines);
-        self.refresh_privacy_states();
+        self.catalog.preview.clear();
+        self.catalog.report = Some(lines);
+        self.refresh_catalog_states();
     }
 
-    fn revert_privacy(&mut self) {
+    fn revert_catalog(&mut self) {
         let ids: Vec<String> = self
             .selected_tweaks()
             .into_iter()
             .map(|tweak| tweak.id)
             .collect();
         if ids.is_empty() {
-            self.privacy.report = Some(vec![self.loc.t("privacy.no_selection")]);
+            self.catalog.report = Some(vec![self.loc.t("privacy.no_selection")]);
             return;
         }
         if !self.engine_ready() {
             let reason = "the change journal is unavailable".to_owned();
-            self.privacy.report = Some(vec![
+            self.catalog.report = Some(vec![
                 self.loc
                     .fmt("privacy.journal_missing", &[("reason", &reason)]),
             ]);
@@ -918,7 +985,7 @@ impl TweakerApp {
         let mut lines = Vec::new();
         for id in &ids {
             let title = self
-                .privacy
+                .catalog
                 .tweaks
                 .iter()
                 .find(|tweak| &tweak.id == id)
@@ -945,8 +1012,8 @@ impl TweakerApp {
                 lines.push(format!("  • {}", failure.error));
             }
         }
-        self.privacy.report = Some(lines);
-        self.refresh_privacy_states();
+        self.catalog.report = Some(lines);
+        self.refresh_catalog_states();
     }
 
     fn about_lines(&self) -> Vec<String> {
@@ -1081,6 +1148,26 @@ mod tests {
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../target/test-tmp")
             .join(format!("app-{tag}-{unique}"))
+    }
+
+    #[test]
+    fn catalog_loader_reads_services_and_skips_unknown_sections() {
+        let mut view = CatalogView {
+            section: "services".to_owned(),
+            ..CatalogView::default()
+        };
+        load_catalog(&mut view);
+        assert_eq!(view.tweaks.len(), 24);
+        assert_eq!(view.selected.len(), 24);
+        assert!(view.tweaks.iter().all(|tweak| tweak.section == "services"));
+
+        let mut unknown = CatalogView {
+            section: "sysinfo".to_owned(),
+            ..CatalogView::default()
+        };
+        load_catalog(&mut unknown);
+        assert!(unknown.tweaks.is_empty());
+        assert!(unknown.selected.is_empty());
     }
 
     #[test]

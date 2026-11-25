@@ -167,6 +167,9 @@ impl IServiceControl for FakeServiceControl {
         let state = services
             .get_mut(service)
             .ok_or_else(|| failure(&format!("service {service} is not installed")))?;
+        if state.status == ServiceStatus::Running {
+            return Err(failure(&format!("service {service} is already running")));
+        }
         state.status = ServiceStatus::Running;
         Ok(())
     }
@@ -179,6 +182,9 @@ impl IServiceControl for FakeServiceControl {
         let state = services
             .get_mut(service)
             .ok_or_else(|| failure(&format!("service {service} is not installed")))?;
+        if state.status == ServiceStatus::Stopped {
+            return Err(failure(&format!("service {service} is already stopped")));
+        }
         state.status = ServiceStatus::Stopped;
         Ok(())
     }

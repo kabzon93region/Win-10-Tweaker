@@ -1,0 +1,294 @@
+[
+  {
+    "id": "SVC-01",
+    "section": "services",
+    "titleKey": "tweak.SVC-01.title",
+    "descriptionKey": "tweak.SVC-01.description",
+    "risk": "high",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "service_stop", "service": "PolicyAgent" },
+      { "kind": "service_start_mode", "service": "PolicyAgent", "mode": "disabled" }
+    ]
+  },
+  {
+    "id": "SVC-02",
+    "section": "services",
+    "titleKey": "tweak.SVC-02.title",
+    "descriptionKey": "tweak.SVC-02.description",
+    "risk": "high",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "service_stop", "service": "IKEEXT" },
+      { "kind": "service_start_mode", "service": "IKEEXT", "mode": "disabled" }
+    ]
+  },
+  {
+    "id": "SVC-03",
+    "section": "services",
+    "titleKey": "tweak.SVC-03.title",
+    "descriptionKey": "tweak.SVC-03.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "service_stop", "service": "WdiServiceHost" },
+      { "kind": "service_start_mode", "service": "WdiServiceHost", "mode": "disabled" }
+    ]
+  },
+  {
+    "id": "SVC-04",
+    "section": "services",
+    "titleKey": "tweak.SVC-04.title",
+    "descriptionKey": "tweak.SVC-04.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "service_stop", "service": "WdiSystemHost" },
+      { "kind": "service_start_mode", "service": "WdiSystemHost", "mode": "disabled" }
+    ]
+  },
+  {
+    "id": "SVC-05",
+    "section": "services",
+    "titleKey": "tweak.SVC-05.title",
+    "descriptionKey": "tweak.SVC-05.description",
+    "risk": "critical",
+    "requiresReboot": true,
+    "actions": [
+      { "kind": "service_stop", "service": "wscsvc" },
+      { "kind": "service_start_mode", "service": "wscsvc", "mode": "disabled" }
+    ]
+  },
+  {
+    "id": "SVC-06",
+    "section": "services",
+    "titleKey": "tweak.SVC-06.title",
+    "descriptionKey": "tweak.SVC-06.description",
+    "risk": "critical",
+    "requiresReboot": true,
+    "actions": [
+      { "kind": "service_stop", "service": "SecurityHealthService" },
+      { "kind": "service_start_mode", "service": "SecurityHealthService", "mode": "disabled" }
+    ]
+  },
+  {
+    "id": "SVC-07",
+    "section": "services",
+    "titleKey": "tweak.SVC-07.title",
+    "descriptionKey": "tweak.SVC-07.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "service_stop", "service": "Themes" },
+      { "kind": "service_start_mode", "service": "Themes", "mode": "disabled" }
+    ]
+  },
+  {
+    "id": "SVC-08",
+    "section": "services",
+    "titleKey": "tweak.SVC-08.title",
+    "descriptionKey": "tweak.SVC-08.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "service_stop", "service": "FontCache" },
+      { "kind": "service_start_mode", "service": "FontCache", "mode": "disabled" }
+    ]
+  },
+  {
+    "id": "SVC-09",
+    "section": "services",
+    "titleKey": "tweak.SVC-09.title",
+    "descriptionKey": "tweak.SVC-09.description",
+    "risk": "high",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "service_stop", "service": "WebClient" },
+      { "kind": "service_start_mode", "service": "WebClient", "mode": "disabled" }
+    ]
+  },
+  {
+    "id": "SVC-10",
+    "section": "services",
+    "titleKey": "tweak.SVC-10.title",
+    "descriptionKey": "tweak.SVC-10.description",
+    "risk": "high",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "service_stop", "service": "Dnscache" },
+      { "kind": "service_start_mode", "service": "Dnscache", "mode": "disabled" }
+    ]
+  },
+  {
+    "id": "SVC-11",
+    "section": "services",
+    "titleKey": "tweak.SVC-11.title",
+    "descriptionKey": "tweak.SVC-11.description",
+    "risk": "high",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "service_stop", "service": "LanmanServer" },
+      { "kind": "service_start_mode", "service": "LanmanServer", "mode": "disabled" }
+    ]
+  },
+  {
+    "id": "SVC-12",
+    "section": "services",
+    "titleKey": "tweak.SVC-12.title",
+    "descriptionKey": "tweak.SVC-12.description",
+    "risk": "high",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "service_stop", "service": "lmhosts" },
+      { "kind": "service_start_mode", "service": "lmhosts", "mode": "disabled" }
+    ]
+  },
+  {
+    "id": "SVC-13",
+    "section": "services",
+    "titleKey": "tweak.SVC-13.title",
+    "descriptionKey": "tweak.SVC-13.description",
+    "risk": "critical",
+    "requiresReboot": true,
+    "actions": [
+      { "kind": "service_stop", "service": "wuauserv" },
+      { "kind": "service_start_mode", "service": "wuauserv", "mode": "disabled" }
+    ]
+  },
+  {
+    "id": "SVC-14",
+    "section": "services",
+    "titleKey": "tweak.SVC-14.title",
+    "descriptionKey": "tweak.SVC-14.description",
+    "risk": "critical",
+    "requiresReboot": true,
+    "actions": [
+      { "kind": "service_stop", "service": "UsoSvc" },
+      { "kind": "service_start_mode", "service": "UsoSvc", "mode": "disabled" }
+    ]
+  },
+  {
+    "id": "SVC-15",
+    "section": "services",
+    "titleKey": "tweak.SVC-15.title",
+    "descriptionKey": "tweak.SVC-15.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "service_stop", "service": "TabletInputService" },
+      { "kind": "service_start_mode", "service": "TabletInputService", "mode": "disabled" }
+    ]
+  },
+  {
+    "id": "SVC-16",
+    "section": "services",
+    "titleKey": "tweak.SVC-16.title",
+    "descriptionKey": "tweak.SVC-16.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "service_stop", "service": "wmiApSrv" },
+      { "kind": "service_start_mode", "service": "wmiApSrv", "mode": "disabled" }
+    ]
+  },
+  {
+    "id": "SVC-17",
+    "section": "services",
+    "titleKey": "tweak.SVC-17.title",
+    "descriptionKey": "tweak.SVC-17.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "service_stop", "service": "WerSvc" },
+      { "kind": "service_start_mode", "service": "WerSvc", "mode": "disabled" }
+    ]
+  },
+  {
+    "id": "SVC-18",
+    "section": "services",
+    "titleKey": "tweak.SVC-18.title",
+    "descriptionKey": "tweak.SVC-18.description",
+    "risk": "high",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "service_stop", "service": "SENS" },
+      { "kind": "service_start_mode", "service": "SENS", "mode": "disabled" }
+    ]
+  },
+  {
+    "id": "SVC-19",
+    "section": "services",
+    "titleKey": "tweak.SVC-19.title",
+    "descriptionKey": "tweak.SVC-19.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "service_stop", "service": "WSearch" },
+      { "kind": "service_start_mode", "service": "WSearch", "mode": "disabled" }
+    ]
+  },
+  {
+    "id": "SVC-20",
+    "section": "services",
+    "titleKey": "tweak.SVC-20.title",
+    "descriptionKey": "tweak.SVC-20.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "service_stop", "service": "SysMain" },
+      { "kind": "service_start_mode", "service": "SysMain", "mode": "disabled" }
+    ]
+  },
+  {
+    "id": "SVC-21",
+    "section": "services",
+    "titleKey": "tweak.SVC-21.title",
+    "descriptionKey": "tweak.SVC-21.description",
+    "risk": "high",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "service_stop", "service": "Spooler" },
+      { "kind": "service_start_mode", "service": "Spooler", "mode": "disabled" }
+    ]
+  },
+  {
+    "id": "SVC-22",
+    "section": "services",
+    "titleKey": "tweak.SVC-22.title",
+    "descriptionKey": "tweak.SVC-22.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "service_stop", "service": "stisvc" },
+      { "kind": "service_start_mode", "service": "stisvc", "mode": "disabled" }
+    ]
+  },
+  {
+    "id": "SVC-23",
+    "section": "services",
+    "titleKey": "tweak.SVC-23.title",
+    "descriptionKey": "tweak.SVC-23.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "service_stop", "service": "SensorService" },
+      { "kind": "service_start_mode", "service": "SensorService", "mode": "disabled" },
+      { "kind": "service_stop", "service": "SensorDataService" },
+      { "kind": "service_start_mode", "service": "SensorDataService", "mode": "disabled" },
+      { "kind": "service_stop", "service": "SensrSvc" },
+      { "kind": "service_start_mode", "service": "SensrSvc", "mode": "disabled" }
+    ]
+  },
+  {
+    "id": "SVC-24",
+    "section": "services",
+    "titleKey": "tweak.SVC-24.title",
+    "descriptionKey": "tweak.SVC-24.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "service_stop", "service": "lfsvc" },
+      { "kind": "service_start_mode", "service": "lfsvc", "mode": "disabled" }
+    ]
+  }
+]

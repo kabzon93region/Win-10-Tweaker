@@ -27,7 +27,7 @@ pub use adapters::{
     IRegistry, IScheduler, IServiceControl, ISystemInfo, OsVersion, ProcessOutput, ServiceState,
     ServiceStatus,
 };
-pub use catalog::{CatalogError, load_privacy};
+pub use catalog::{CatalogError, load_privacy, load_section, load_services};
 pub use engine::{ApplyReport, Engine, FailedAction, PlanError, RevertReport};
 pub use journal::{AppliedOp, Journal, JournalRecord, Phase, Snapshot};
 pub use lang::Lang;

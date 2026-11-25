@@ -10,6 +10,7 @@ use std::fmt;
 use crate::model::{DefinitionError, TweakDefinition};
 
 const PRIVACY_JSON: &str = include_str!("../data/tweaks/privacy.json");
+const SERVICES_JSON: &str = include_str!("../data/tweaks/services.json");
 
 /// Problems found while loading the embedded catalog.
 #[derive(Debug)]
@@ -53,9 +54,30 @@ impl std::error::Error for CatalogError {}
 
 /// Loads the privacy section of the catalog.
 pub fn load_privacy() -> Result<Vec<TweakDefinition>, CatalogError> {
-    let tweaks: Vec<TweakDefinition> = serde_json::from_str(PRIVACY_JSON)
-        .map_err(|error| CatalogError::Parse(error.to_string()))?;
-    validate(&tweaks, "privacy")?;
+    load(PRIVACY_JSON, "privacy")
+}
+
+/// Loads the services section of the catalog.
+pub fn load_services() -> Result<Vec<TweakDefinition>, CatalogError> {
+    load(SERVICES_JSON, "services")
+}
+
+/// Loads a catalog section by its id.
+///
+/// `Ok(None)` means the section is not a catalog (a tool screen) or its data has
+/// not been added yet; the UI shows the placeholder in that case.
+pub fn load_section(section: &str) -> Result<Option<Vec<TweakDefinition>>, CatalogError> {
+    match section {
+        "privacy" => load_privacy().map(Some),
+        "services" => load_services().map(Some),
+        _ => Ok(None),
+    }
+}
+
+fn load(json: &str, section: &str) -> Result<Vec<TweakDefinition>, CatalogError> {
+    let tweaks: Vec<TweakDefinition> =
+        serde_json::from_str(json).map_err(|error| CatalogError::Parse(error.to_string()))?;
+    validate(&tweaks, section)?;
     Ok(tweaks)
 }
 
@@ -126,6 +148,94 @@ mod tests {
             .expect("hosts block action");
         assert!(block.len() >= 55, "expected a real domain list");
         assert!(block.iter().all(|domain| !domain.trim().is_empty()));
+    }
+
+    #[test]
+    fn services_catalog_loads_with_known_ids() {
+        let tweaks = load_services().expect("catalog must load");
+        let ids: Vec<&str> = tweaks.iter().map(|tweak| tweak.id.as_str()).collect();
+        assert_eq!(ids.len(), 24);
+        assert_eq!(ids.first(), Some(&"SVC-01"));
+        assert_eq!(ids.last(), Some(&"SVC-24"));
+        for tweak in &tweaks {
+            assert!(!tweak.actions.is_empty(), "{} has no actions", tweak.id);
+            assert_eq!(tweak.section, "services");
+            assert!(
+                tweak.id.starts_with("SVC-"),
+                "{} is not a service id",
+                tweak.id
+            );
+        }
+    }
+
+    #[test]
+    fn service_risk_matches_the_feature_list() {
+        let expected: [(&str, &[&str], RiskLevel, bool); 24] = [
+            ("SVC-01", &["PolicyAgent"], RiskLevel::High, false),
+            ("SVC-02", &["IKEEXT"], RiskLevel::High, false),
+            ("SVC-03", &["WdiServiceHost"], RiskLevel::Medium, false),
+            ("SVC-04", &["WdiSystemHost"], RiskLevel::Medium, false),
+            ("SVC-05", &["wscsvc"], RiskLevel::Critical, true),
+            (
+                "SVC-06",
+                &["SecurityHealthService"],
+                RiskLevel::Critical,
+                true,
+            ),
+            ("SVC-07", &["Themes"], RiskLevel::Medium, false),
+            ("SVC-08", &["FontCache"], RiskLevel::Medium, false),
+            ("SVC-09", &["WebClient"], RiskLevel::High, false),
+            ("SVC-10", &["Dnscache"], RiskLevel::High, false),
+            ("SVC-11", &["LanmanServer"], RiskLevel::High, false),
+            ("SVC-12", &["lmhosts"], RiskLevel::High, false),
+            ("SVC-13", &["wuauserv"], RiskLevel::Critical, true),
+            ("SVC-14", &["UsoSvc"], RiskLevel::Critical, true),
+            ("SVC-15", &["TabletInputService"], RiskLevel::Medium, false),
+            ("SVC-16", &["wmiApSrv"], RiskLevel::Medium, false),
+            ("SVC-17", &["WerSvc"], RiskLevel::Medium, false),
+            ("SVC-18", &["SENS"], RiskLevel::High, false),
+            ("SVC-19", &["WSearch"], RiskLevel::Medium, false),
+            ("SVC-20", &["SysMain"], RiskLevel::Medium, false),
+            ("SVC-21", &["Spooler"], RiskLevel::High, false),
+            ("SVC-22", &["stisvc"], RiskLevel::Medium, false),
+            (
+                "SVC-23",
+                &["SensorService", "SensorDataService", "SensrSvc"],
+                RiskLevel::Medium,
+                false,
+            ),
+            ("SVC-24", &["lfsvc"], RiskLevel::Medium, false),
+        ];
+        let tweaks = load_services().expect("catalog");
+        assert_eq!(tweaks.len(), expected.len());
+        for (tweak, (id, services, risk, reboot)) in tweaks.iter().zip(expected) {
+            assert_eq!(tweak.id, id);
+            assert_eq!(tweak.risk, risk, "{id}: risk");
+            assert_eq!(tweak.requires_reboot, reboot, "{id}: reboot flag");
+            let mut names: Vec<&str> = tweak
+                .actions
+                .iter()
+                .filter_map(|action| match action {
+                    Action::ServiceStop { service } | Action::ServiceStartMode { service, .. } => {
+                        Some(service.as_str())
+                    }
+                    _ => None,
+                })
+                .collect();
+            names.sort_unstable();
+            names.dedup();
+            let mut wanted = services.to_vec();
+            wanted.sort_unstable();
+            assert_eq!(names, wanted, "{id}: services");
+        }
+    }
+
+    #[test]
+    fn catalog_sections_are_available_by_id() {
+        assert!(load_section("privacy").expect("privacy").is_some());
+        assert!(load_section("services").expect("services").is_some());
+        assert!(load_section("ui").expect("ui").is_none());
+        assert!(load_section("sysinfo").expect("sysinfo").is_none());
     }
 
     #[test]

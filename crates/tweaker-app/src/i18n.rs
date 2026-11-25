@@ -252,7 +252,7 @@ mod tests {
     ];
 
     /// Exact number of interface strings shipped in each language.
-    const KEY_COUNT: usize = 127;
+    const KEY_COUNT: usize = 175;
 
     #[test]
     fn both_catalogs_load_and_have_equal_keys() {
@@ -280,7 +280,9 @@ mod tests {
     #[test]
     fn every_catalog_tweak_has_texts_in_both_languages() {
         let localizer = Localizer::try_load(Lang::Ru).expect("catalogs must load");
-        for tweak in tweaker_core::catalog::load_privacy().expect("privacy catalog") {
+        let mut tweaks = tweaker_core::catalog::load_privacy().expect("privacy catalog");
+        tweaks.extend(tweaker_core::catalog::load_services().expect("services catalog"));
+        for tweak in tweaks {
             for key in [&tweak.title_key, &tweak.description_key] {
                 for lang in Lang::ALL {
                     let text = localizer

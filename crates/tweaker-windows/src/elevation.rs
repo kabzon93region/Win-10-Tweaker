@@ -58,9 +58,14 @@ pub fn is_elevated() -> bool {
 /// Makes sure the process is elevated.
 ///
 /// If it is not, shows a localized question; when the user agrees, starts a new
-/// elevated copy of the same executable. The caller must exit on any result
-/// other than [`ElevationResult::AlreadyElevated`].
-pub fn ensure_elevated(title: &str, question: &str, failure: &str) -> ElevationResult {
+/// elevated copy of the same executable with the same command line arguments. The
+/// caller must exit on any result other than [`ElevationResult::AlreadyElevated`].
+pub fn ensure_elevated(
+    title: &str,
+    question: &str,
+    failure: &str,
+    args: &[String],
+) -> ElevationResult {
     if is_elevated() {
         return ElevationResult::AlreadyElevated;
     }
@@ -68,7 +73,7 @@ pub fn ensure_elevated(title: &str, question: &str, failure: &str) -> ElevationR
     if answer != IDYES {
         return ElevationResult::Declined;
     }
-    match relaunch_elevated() {
+    match relaunch_elevated(args) {
         Ok(()) => ElevationResult::Relaunched,
         Err(error) => {
             let _ = message_box(title, failure, MB_OK | MB_ICONERROR);
@@ -86,9 +91,15 @@ fn message_box(title: &str, text: &str, style: MESSAGEBOX_STYLE) -> MESSAGEBOX_R
 }
 
 /// Starts a new copy of this executable through the `runas` verb.
-fn relaunch_elevated() -> Result<(), String> {
+fn relaunch_elevated(args: &[String]) -> Result<(), String> {
     let executable = std::env::current_exe().map_err(|error| error.to_string())?;
     let executable = wide(&executable.to_string_lossy());
+    let parameters = args
+        .iter()
+        .map(|arg| quote_arg(arg))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let parameters = wide(&parameters);
 
     let mut info = SHELLEXECUTEINFOW {
         cbSize: size_of::<SHELLEXECUTEINFOW>() as u32,
@@ -96,10 +107,11 @@ fn relaunch_elevated() -> Result<(), String> {
         hwnd: HWND::default(),
         lpVerb: w!("runas"),
         lpFile: PCWSTR(executable.as_ptr()),
+        lpParameters: PCWSTR(parameters.as_ptr()),
         nShow: SW_SHOWNORMAL.0,
         ..Default::default()
     };
-    // SAFETY: `info` is fully initialized and the file name lives until the call returns.
+    // SAFETY: `info` is fully initialized and both buffers live until the call returns.
     unsafe {
         ShellExecuteExW(&mut info).map_err(|error| error.to_string())?;
         if !info.hProcess.is_invalid() {
@@ -107,6 +119,38 @@ fn relaunch_elevated() -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+/// Quotes one command-line argument the way `CommandLineToArgvW` expects.
+fn quote_arg(arg: &str) -> String {
+    if !arg.is_empty() && !arg.contains([' ', '\t', '"']) {
+        return arg.to_owned();
+    }
+    let mut quoted = String::with_capacity(arg.len() + 2);
+    quoted.push('"');
+    let mut backslashes = 0usize;
+    for character in arg.chars() {
+        match character {
+            '\\' => {
+                backslashes += 1;
+                quoted.push('\\');
+            }
+            '"' => {
+                quoted.push_str(&"\\".repeat(backslashes + 1));
+                quoted.push('"');
+                backslashes = 0;
+            }
+            other => {
+                backslashes = 0;
+                quoted.push(other);
+            }
+        }
+    }
+    // Backslashes right before the closing quote must be doubled, otherwise the
+    // argument would end with an escaped quote.
+    quoted.push_str(&"\\".repeat(backslashes));
+    quoted.push('"');
+    quoted
 }
 
 /// NUL-terminated UTF-16, the form every Win32 text API expects.
@@ -126,5 +170,16 @@ mod tests {
     #[test]
     fn wide_strings_are_nul_terminated() {
         assert_eq!(wide("abc"), vec![0x0061, 0x0062, 0x0063, 0x0000]);
+    }
+
+    #[test]
+    fn arguments_are_quoted_for_the_elevated_copy() {
+        assert_eq!(quote_arg("--section"), "--section");
+        assert_eq!(quote_arg("C:\\a b\\shot.png"), "\"C:\\a b\\shot.png\"");
+        assert_eq!(quote_arg("say \"hi\""), "\"say \\\"hi\\\"\"");
+        assert_eq!(quote_arg(""), "\"\"");
+        assert_eq!(quote_arg("C:\\a b\\"), "\"C:\\a b\\\\\"");
+        assert_eq!(quote_arg("a b\\\\"), "\"a b\\\\\\\\\"");
+        assert_eq!(quote_arg("a\\\\"), "a\\\\");
     }
 }

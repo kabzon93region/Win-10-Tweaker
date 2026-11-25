@@ -722,17 +722,7 @@ impl<'a> Engine<'a> {
                 self.services
                     .set_start_mode(service, state.start_mode)
                     .map_err(|error| error.message)?;
-                match state.status {
-                    ServiceStatus::Running => {
-                        self.services.start(service).map_err(|error| error.message)
-                    }
-                    ServiceStatus::Stopped => {
-                        self.services.stop(service).map_err(|error| error.message)
-                    }
-                    other => Err(format!(
-                        "cannot restore service {service} in state {other:?}"
-                    )),
-                }
+                self.set_service_status(service, state.status)
             }
             (
                 Action::TaskSetEnabled { .. } | Action::TaskSetEnabledMatching { .. },
@@ -816,6 +806,28 @@ impl<'a> Engine<'a> {
             (Action::ProcessRun { .. }, _) => Err("this action cannot be reverted".to_owned()),
             _ => Err("journal snapshot does not match the action".to_owned()),
         }
+    }
+
+    /// Brings a service to the requested run status.
+    ///
+    /// The service may already be in that status (another program started it,
+    /// Windows restarted it); calling `start`/`stop` then would fail in the SCM, so
+    /// the current state is read first and an equal status is a no-op.
+    fn set_service_status(&self, service: &str, status: ServiceStatus) -> Result<(), String> {
+        let current = self.service_state(service)?;
+        if current.status == status {
+            return Ok(());
+        }
+        match status {
+            ServiceStatus::Running => self.services.start(service),
+            ServiceStatus::Stopped => self.services.stop(service),
+            other => {
+                return Err(format!(
+                    "cannot restore service {service} in state {other:?}"
+                ));
+            }
+        }
+        .map_err(|error| error.message)
     }
 }
 
@@ -1298,6 +1310,77 @@ mod tests {
             .expect("state");
         assert_eq!(state.status, ServiceStatus::Stopped);
         assert_eq!(state.start_mode, ServiceStartMode::Automatic);
+    }
+
+    #[test]
+    fn revert_does_not_start_an_already_running_service() {
+        let harness = Harness::new("service-already-running");
+        harness.services.add(
+            "Spooler",
+            ServiceState {
+                status: ServiceStatus::Running,
+                start_mode: ServiceStartMode::Automatic,
+            },
+        );
+        let engine = harness.engine();
+        // A single stop action: its snapshot says Running, so the revert wants to
+        // start the service again.
+        let definition = tweak(vec![Action::ServiceStop {
+            service: "Spooler".to_owned(),
+        }]);
+        assert!(engine.apply_tweak(&definition).success());
+        // Something else started the service after our stop; the revert must not
+        // fail because `start` on a running service is an SCM error.
+        harness.services.add(
+            "Spooler",
+            ServiceState {
+                status: ServiceStatus::Running,
+                start_mode: ServiceStartMode::Automatic,
+            },
+        );
+        let revert = engine.revert("PRIV-01");
+        assert!(revert.success(), "{revert:?}");
+        let state = harness
+            .services
+            .query("Spooler")
+            .expect("query")
+            .expect("state");
+        assert_eq!(state.status, ServiceStatus::Running);
+        assert_eq!(state.start_mode, ServiceStartMode::Automatic);
+    }
+
+    #[test]
+    fn revert_does_not_stop_an_already_stopped_service() {
+        let harness = Harness::new("service-already-stopped");
+        harness.services.add(
+            "Spooler",
+            ServiceState {
+                status: ServiceStatus::Stopped,
+                start_mode: ServiceStartMode::Manual,
+            },
+        );
+        let engine = harness.engine();
+        let definition = tweak(vec![Action::ServiceStart {
+            service: "Spooler".to_owned(),
+        }]);
+        assert!(engine.apply_tweak(&definition).success());
+        // The service was stopped again by somebody else before the revert.
+        harness.services.add(
+            "Spooler",
+            ServiceState {
+                status: ServiceStatus::Stopped,
+                start_mode: ServiceStartMode::Manual,
+            },
+        );
+        let revert = engine.revert("PRIV-01");
+        assert!(revert.success(), "{revert:?}");
+        let state = harness
+            .services
+            .query("Spooler")
+            .expect("query")
+            .expect("state");
+        assert_eq!(state.status, ServiceStatus::Stopped);
+        assert_eq!(state.start_mode, ServiceStartMode::Manual);
     }
 
     #[test]

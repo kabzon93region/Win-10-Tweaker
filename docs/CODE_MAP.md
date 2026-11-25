@@ -3,7 +3,7 @@
 Навигация по текущему коду. Источник истины — исходники; карта обновляется на каждом этапе,
 где меняются публичные типы, интерфейсы или поток данных.
 
-Актуально для этапа 4 (приёмочные тесты раздела `privacy`, смоук и негативные сценарии).
+Актуально для этапа 5, часть 1 (универсальный экран каталога, разделы `privacy` и `services`).
 
 ## Crates
 
@@ -18,7 +18,7 @@
 | Файл | Публичные элементы | Роль |
 |---|---|---|
 | `src/action.rs` | `RegistryRoot`, `RegistryKey`, `RegistryValue`, `ServiceStartMode`, `Action` (включая `HostsBlock`, `TaskSetEnabled`, `TaskSetEnabledMatching` с `optional`), `render_hosts_block`/`strip_hosts_block`/`hosts_block_applied` | Декларативные действия; `Action::describe()` — предпросмотр, `is_reversible()` |
-| `src/catalog.rs` | `CatalogError`, `load_privacy` | Embedded-каталог `data/tweaks/privacy.json` (17 пунктов), валидация id/секций/ключей |
+| `src/catalog.rs` | `CatalogError`, `load_privacy`, `load_services`, `load_section` | Embedded-каталоги `data/tweaks/{privacy,services}.json`; `load_section` возвращает `None` для инструментов и ещё не заполненных разделов |
 | `src/adapters.rs` | трейты `IRegistry`, `IFileSystem`, `IServiceControl`, `IProcessRunner`, `IFirewall`, `IScheduler`, `IAppx`, `ISystemInfo`; `AdapterError`, `ServiceState`, `ServiceStatus`, `TaskInfo`, `ProcessOutput`, `OsVersion`, `FirewallRule`, `FirewallDirection` | Единственный мост к системе; `IScheduler::list(folder)` — имена задач, `is_enabled`/`set_enabled` — по полному пути |
 | `src/model.rs` | `RiskLevel`, `TweakDefinition`, `DefinitionError`, `TweakState`, `PlanStep`, `Plan` | Пункт каталога как данные; валидация id/ключей |
 | `src/journal.rs` | `Snapshot`, `Phase`, `JournalRecord`, `AppliedOp`, `Journal` | JSONL-журнал: две фазы, ротация, чтение, поиск неоткаченных и незавершённых операций |
@@ -48,8 +48,8 @@
 
 | Файл | Элементы | Роль |
 |---|---|---|
-| `src/main.rs` | `Mode`, `parse_args` | `--selftest`, `--smoke`, `--screenshot <png>`, `--version`, `--help` |
-| `src/app.rs` | публичные `RunMode`, `install_style`; приватные `TweakerApp` (реализует `eframe::App`), `PrivacyView`, `PrivacyAction`, `save_screenshot` | Окно, меню 14 разделов, раздел `privacy` (список 17 пунктов, состояния, предупреждение о риске, предпросмотр, подтверждение, apply/revert), защита от второй копии окна, статус-бар, режим снимка + watchdog |
+| `src/main.rs` | `Mode`, `parse_args` | `--selftest`, `--smoke`, `--screenshot <png>`, `--section <id>`, `--version`, `--help` |
+| `src/app.rs` | публичные `RunMode`, `install_style`; приватные `TweakerApp` (реализует `eframe::App`), `CatalogView`, `CatalogAction`, `load_catalog`, `select_section`, `save_screenshot` | Окно, меню 14 разделов, универсальный экран каталога (любой раздел с данными), защита от второй копии окна, статус-бар, режим снимка + watchdog |
 | `examples/tweak_probe.rs` | `main`, `run` | Живая проба одного пункта каталога вне окна; в релиз не входит |
 | `src/i18n.rs` | `Localizer`, `detect_lang` | ru/en из embedded JSON, форматирование `{placeholders}` |
 | `src/selftest.rs` | `run` | Проверки без окна: пути, лог, локализация, разделы, права, ОС |
@@ -59,7 +59,9 @@
 
 | Файл | Что проверяет |
 |---|---|
-| `crates/tweaker-core/tests/privacy_section.rs` | Приёмочный цикл по каждому из 17 пунктов на фейках: план, снимок, apply, detect, идемпотентность, откат, повторный откат, записи журнала; обратимость действий; недоступность без службы; ошибки записи hosts и реестра |
+| `crates/tweaker-core/tests/common/mod.rs` | Общий harness: фейковая машина, посев состояния по действиям пункта, полный приёмочный цикл (`check_item`) |
+| `crates/tweaker-core/tests/privacy_section.rs` | 17 тестов по пунктам `privacy` + обратимость, недоступность без служб, ошибки записи hosts и реестра |
+| `crates/tweaker-core/tests/services_section.rs` | 24 теста по пунктам `services` + недоступность без службы + восстановление режима запуска |
 | `crates/*/src/**` (`#[cfg(test)]`) | Юнит-тесты движка, журнала, логгера, каталога, модели, адаптеров Windows, локализации, CLI-режимов |
 
 ## Поток данных
@@ -87,10 +89,9 @@ TweakDefinition (данные каталога, этап 3)
 5. Откат идёт в обратном порядке и тоже проверяется; повторный откат — `nothing_to_revert`.
 6. `ProcessRun` необратим и в откате помечается ошибкой.
 
-## Известные пробелы (на этапе 4)
+## Известные пробелы (на этапе 5, часть 1)
 
-- Каталог `privacy`: 17 из 17 пунктов.
-- UI подключён к движку для `privacy`; остальные разделы пока заглушка.
+- Каталог: `privacy` 17/17, `services` 24/24; `ui`, `system`, `context`, `apps`, `autorun` ещё показывают заглушку.
 - Применение выполняется в UI-потоке: прогресса и отмены нет (дефект D-2 из `TEST_REPORT.md`, этап 6).
 - Незавершённая операция не предлагается к откату при старте (D-8, этап 6).
 - Защита от второй копии действует в пределах текущей сессии (`Local\`, D-7).
@@ -109,6 +110,7 @@ TweakDefinition (данные каталога, этап 3)
 ```
 cargo test --workspace
 cargo test -p tweaker-core --test privacy_section
+cargo test -p tweaker-core --test services_section
 cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all -- --check
 ```

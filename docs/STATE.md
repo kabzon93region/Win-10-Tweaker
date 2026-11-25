@@ -1,21 +1,21 @@
 # Состояние работ
 
-Обновлено: 2026-11-25 (этап 4 завершён: приёмочные тесты раздела `privacy`, отчёт о тестировании).
+Обновлено: 2026-11-25 (этап 5, часть 1: универсальный экран каталога и раздел «Службы», 24 пункта).
 
 ## Текущий статус
 
 | Параметр | Значение |
 |---|---|
-| Этап | 4 — тесты: 17 приёмочных тестов каталога, смоук и негативные сценарии, отчёт `TEST_REPORT.md` |
+| Этап | 5 — остальные разделы: часть 1 (универсальный экран каталога + `services` 24/24); дальше `ui`, `system`, `context`, `autorun`, `apps` |
 | Код | `Cargo.toml`, `crates/tweaker-core`, `crates/tweaker-windows`, `crates/tweaker-app` |
 | Версия | 0.1.0 |
-| Git | `e2bba3b` (этап 4; этап 3 — `e1237a8`, этап 2 — `1e05d14`, этап 1 — `88de898`) |
+| Git | `a7e7e8f` (этап 4); часть 1 этапа 5 — коммит после аудита |
 | Сборка | `cargo build --workspace` — успешно; `cargo build --release -p tweaker-app` — успешно |
-| Артефакт | `target/release/wintweaker.exe` — 6 740 480 байт, sha256 `AAA0B000602A010DC0A4558C31D2412EFA986A978AB9BAD12F9B3C48F41374A2` |
-| Тесты | `cargo test --workspace` — 143 passed, 1 ignored (app 17, core 82, core-tests 21, windows 23) |
-| Проверки | смоук `--selftest`/`--smoke`/`--screenshot` rc=0; живой прогон второй копии; отчёт `docs/TEST_REPORT.md` (31 из 46 проверок пройдено, 15 отложено, 0 провалов); clippy/fmt чисто (`%TEMP%\wintweaker-stage4-lint.txt`) |
-| Запуск | debug: 1,78 с до первых кадров, пик памяти 75,4 МБ; release-замер — этап 8 |
-| Блокирует | нет; открытые дефекты D-2…D-8 (отмена/фон, экспорт журнала, живые записи, hosts UTF-8, пустой ключ, границы сессии, pending при старте) запланированы на этапы 6–8 |
+| Артефакт | `target/release/wintweaker.exe` — 6 770 176 байт, sha256 `79B767459EEA65A7AC68A1AB83C08DFDBBF462923D8D462324F95B0E2DEBFFE4` |
+| Тесты | `cargo test --workspace` — 178 passed, 1 ignored (app 20, core 87, core-tests 21+26, windows 24) |
+| Проверки | clippy/fmt чисто (`%TEMP%\wintweaker-stage5a-lint.txt`); снимок экрана `services` (`--section services --screenshot`) — 24 пункта, состояния, риск, предупреждение; `--selftest` rc=0 |
+| Запуск | debug: ≈1,8 с до первых кадров; release-замер — этап 8 |
+| Блокирует | нет; открытые дефекты D-2…D-8 прежние |
 
 ## Окружение сборки
 
@@ -40,10 +40,10 @@
 | Путь | Что внутри |
 |---|---|
 | `Cargo.toml` | workspace из трёх crates, resolver 3, edition 2024 |
-| `crates/tweaker-core` | модель `TweakDefinition/Action/Plan`, каталог разделов (`data/sections.json`) и раздел `privacy` (17 пунктов), движок apply/detect/revert, журнал JSONL с двумя фазами, трейты адаптеров и фейки, действия hosts-блока и задач планировщика, пути, логгер, `Lang`; приёмочные тесты каталога в `tests/privacy_section.rs` |
+| `crates/tweaker-core` | модель `TweakDefinition/Action/Plan`, каталог разделов (`data/sections.json`) и разделы `privacy` (17) и `services` (24), движок apply/detect/revert, журнал JSONL с двумя фазами, трейты адаптеров и фейки, действия hosts-блока и задач планировщика, пути, логгер, `Lang`; приёмочные тесты каталога в `tests/` |
 | `crates/tweaker-windows` | адаптеры реестра, файлов, процессов, служб и планировщика задач (через `schtasks.exe`); права администратора и перезапуск, язык системы, сведения об ОС, защита от второй копии (`single_instance`), системное сообщение (`message`) |
-| `crates/tweaker-app` | окно egui, меню 14 разделов, ru/en, режимы `--selftest`, `--smoke`, `--screenshot`, проба `tweak_probe` |
-| `crates/tweaker-app/i18n` | `ru.json`, `en.json` — по 127 строк, полнота проверяется тестом |
+| `crates/tweaker-app` | окно egui, меню 14 разделов, универсальный экран каталога (любой раздел с данными), ru/en, режимы `--selftest`, `--smoke`, `--screenshot`, `--section <id>`, проба `tweak_probe` |
+| `crates/tweaker-app/i18n` | `ru.json`, `en.json` — по 175 строк, полнота проверяется тестом |
 | `crates/tweaker-app/build.rs` | манифест: release — `requireAdministrator`, debug — `asInvoker` |
 
 ## План этапов
@@ -55,28 +55,31 @@
 | 2 | Движок: модели `Tweak/Plan/Action`, адаптеры-интерфейсы, журнал JSONL, apply/detect/revert на одном пункте | unit-тесты на фейковых адаптерах зелёные | завершён |
 | 3 | Первый раздел каталога — `privacy` (17 пунктов) | все 17 пунктов применяются и откатываются | завершён |
 | 4 | Тесты: unit по разделу, смоук и негативные сценарии по `TESTPLAN.md` | отчёт о тестировании | завершён |
-| 5 | Остальные разделы настроек (context, ui, system, services, autorun, apps) | по критериям `TESTPLAN.md` | не начат |
+| 5 | Остальные разделы настроек (context, ui, system, services, autorun, apps) | по критериям `TESTPLAN.md` | в работе: `services` — 24/24, универсальный экран каталога; остальные разделы — следующие части |
 | 6 | Очистка и оптимизация (опасные операции, предпросмотр, отмена) | 🔴-пункты только с подтверждением | не начат |
 | 7 | Сервисные разделы: sysinfo, backup, профиль, обновления, VirusTotal, about, maintenance | по решению владельца | не начат |
 | 8 | Приёмка: чек-лист `TESTPLAN.md`, воспроизводимая сборка, документация | приёмочный отчёт | не начат |
 
-## Артефакты этапов 1–4
+## Артефакты этапов 1–5
 
 | Артефакт | Где | Проверка |
 |---|---|---|
 | Каталог `privacy` | `crates/tweaker-core/data/tweaks/privacy.json` | 17 пунктов, ids PRIV-01…PRIV-17, тесты каталога |
+| Каталог `services` | `crates/tweaker-core/data/tweaks/services.json` | 24 пункта, ids SVC-01…SVC-24, стоп + `Start=4`, откат по снимку |
+| Универсальный экран каталога | `crates/tweaker-app/src/app.rs` | любой раздел с данными: список, состояния, риск, предпросмотр, подтверждение, apply/revert; `--section <id>` |
 | Раздел `privacy` в окне | `crates/tweaker-app/src/app.rs` | список 17 пунктов, состояния, предпросмотр, подтверждение, отчёт; PNG `stage3-full.png` |
+| Раздел `services` в окне | `crates/tweaker-app/src/app.rs` | 24 пункта, реальные состояния, риск, пометка перезапуска; PNG `services.png` |
 | Живой прогон | `crates/tweaker-app/examples/tweak_probe.rs` | detect всех 17 пунктов; PRIV-13 apply/revert на этом ПК |
 | Исходники каркаса | `crates/` | `cargo build --workspace` rc=0 |
 | Зафиксированные зависимости | `Cargo.lock` | `cargo build --locked` |
-| Движок и журнал | `crates/tweaker-core/src/{action,adapters,catalog,model,journal,engine,fake}.rs` | 143 теста; apply/detect/revert/журнал/сбой/восстановление/hosts/задачи |
-| Приёмочные тесты раздела | `crates/tweaker-core/tests/privacy_section.rs` | 21 тест: полный цикл по каждому из 17 пунктов, ошибки адаптеров, отсутствие служб |
+| Движок и журнал | `crates/tweaker-core/src/{action,adapters,catalog,model,journal,engine,fake}.rs` | apply/detect/revert/журнал/сбой/восстановление/hosts/задачи |
+| Приёмочные тесты разделов | `crates/tweaker-core/tests/{common,privacy_section,services_section}.rs` | 21 + 26 тестов: полный цикл по каждому пункту, ошибки адаптеров, отсутствие служб |
 | Адаптеры Windows | `crates/tweaker-windows/src/{registry,files,process,services,scheduler,single_instance,message}.rs` | чтение HKLM, служб и задач; защита от второй копии; запись HKCU проверена standalone-запуском вне песочницы |
-| Юнит-тесты | `crates/*/src/**` (`#[cfg(test)]`) | 143 passed, 1 ignored |
-| Отчёт о тестировании | `docs/TEST_REPORT.md` | 31/46 проверок TESTPLAN пройдено, 15 отложено, 0 провалов |
-| Карта кода | `docs/CODE_MAP.md` | обновлена на этапе 4 |
+| Юнит-тесты | `crates/*/src/**` (`#[cfg(test)]`) | 178 passed, 1 ignored |
+| Отчёт о тестировании | `docs/TEST_REPORT.md` | 31/46 проверок TESTPLAN пройдено, 15 отложено, 0 провалов (этап 4) |
+| Карта кода | `docs/CODE_MAP.md` | обновлена на этапе 5, часть 1 |
 | Отчёт самопроверки | `%LocalAppData%\WinTweaker\logs\wintweaker.log` | `--selftest` rc=0 |
-| Снимок окна | `%TEMP%\wintweaker-run\stage3-full.png` (вне git) | 1200×780, снят самим приложением |
+| Снимок окна | `%TEMP%\wintweaker-run\services.png` (вне git) | 1200×780, раздел `services`, снят самим приложением |
 | Release-бинарник | `target/release/wintweaker.exe` (не в git) | см. «Артефакт» выше |
 
 ## Журнал этапов
@@ -89,3 +92,4 @@
 | 2026-11-25 | 3 (часть 1) | Каталог `privacy` (11 пунктов: реестр и hosts), блок hosts с маркерами, адаптер служб, раздел `privacy` в окне (состояния, предпросмотр, подтверждение, apply/revert, отчёт), проба `tweak_probe`, i18n 114 строк | `cargo test` 109 passed (core 76, windows 16, app 17), 1 ignored; clippy/fmt чисто; живой PRIV-13 apply/revert; PNG `stage3-privacy.png` |
 | 2026-11-25 | 3 (часть 2) | Пункты 03/04/05/16/17: действия `TaskSetEnabled`/`TaskSetEnabledMatching` (с `optional` для необязательного ПО), адаптер планировщика на `schtasks.exe`, службы через `IServiceControl`; каталог 17/17, i18n 125 строк, пометка «11 из 17» снята, в окне счётчик пунктов и предупреждение о риске | `cargo test` 120 passed (core 82, windows 21, app 17), 1 ignored; clippy/fmt чисто; живой detect 17 пунктов; сверка префиксов задач с реальным списком; PNG `stage3-full.png`; release 6,74 МБ |
 | 2026-11-25 | 4 | Приёмочные тесты: по тесту на каждый из 17 пунктов (план, снимок, apply, detect, идемпотентность, откат, повторный откат, журнал), тесты ошибок адаптеров и отсутствия служб; защита от второй копии (мьютекс + сообщение); отчёт `TEST_REPORT.md`; i18n 127 строк | `cargo test` 143 passed (app 17, core 82, core-tests 21, windows 23), 1 ignored; clippy/fmt чисто; `--smoke` rc=0, пик памяти 75,4 МБ, старт 1,78 с; скан release на секреты |
+| 2026-11-25 | 5 (часть 1) | Универсальный экран каталога вместо жёстко привязанного `privacy`: загрузка любого раздела по id, переключение в меню, флаг `--section <id>`; раздел `services` — 24 пункта (стоп + `Start=4`, откат по снимку); i18n 175 строк; тесты `common`/`services_section` | `cargo test` 178 passed (app 20, core 87, core-tests 21+26, windows 24), 1 ignored; clippy/fmt чисто; снимок `services.png` — 24 пункта с реальными состояниями; `--section` проверен |
