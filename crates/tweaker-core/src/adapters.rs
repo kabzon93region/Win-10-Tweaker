@@ -113,6 +113,18 @@ pub struct FirewallRule {
     pub block: bool,
 }
 
+/// One registry key with everything below it.
+///
+/// Used when an action removes a whole key: the snapshot must keep the values and
+/// subkeys so the revert can recreate them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RegistryTree {
+    /// Values of this key, default value included (empty name).
+    pub values: Vec<(String, RegistryValue)>,
+    /// Subkeys with their own trees, sorted by name.
+    pub subkeys: Vec<(String, RegistryTree)>,
+}
+
 /// Registry access.
 pub trait IRegistry {
     /// Reads a value; `Ok(None)` means the value does not exist.
@@ -126,6 +138,10 @@ pub trait IRegistry {
     ) -> Result<(), AdapterError>;
     /// Deletes a value; a missing value is not an error.
     fn delete(&self, key: &RegistryKey, name: &str) -> Result<(), AdapterError>;
+    /// Reads the whole key tree; `Ok(None)` when the key does not exist.
+    fn read_tree(&self, key: &RegistryKey) -> Result<Option<RegistryTree>, AdapterError>;
+    /// Deletes a key with all values and subkeys; a missing key is not an error.
+    fn delete_tree(&self, key: &RegistryKey) -> Result<(), AdapterError>;
 }
 
 /// File access. Only text files are handled by the catalog today.
@@ -136,6 +152,10 @@ pub trait IFileSystem {
     fn read_text(&self, path: &Path) -> Result<Option<String>, AdapterError>;
     /// Writes UTF-8 text, creating parent directories.
     fn write_text(&self, path: &Path, content: &str) -> Result<(), AdapterError>;
+    /// Reads raw bytes; `Ok(None)` when the file is missing.
+    fn read_bytes(&self, path: &Path) -> Result<Option<Vec<u8>>, AdapterError>;
+    /// Writes raw bytes, creating parent directories.
+    fn write_bytes(&self, path: &Path, bytes: &[u8]) -> Result<(), AdapterError>;
     /// Deletes a file; a missing file is not an error.
     fn delete(&self, path: &Path) -> Result<(), AdapterError>;
 }

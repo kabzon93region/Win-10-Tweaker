@@ -187,6 +187,14 @@ pub enum Action {
         /// Value name.
         name: String,
     },
+    /// Delete a whole registry key with its values and subkeys.
+    ///
+    /// Missing key is not an error. The snapshot keeps the full tree so the
+    /// revert can recreate it.
+    RegistryDeleteKey {
+        /// Key to delete.
+        key: RegistryKey,
+    },
     /// Write a UTF-8 text file, creating parent folders if needed.
     FileWrite {
         /// Target file.
@@ -198,6 +206,13 @@ pub enum Action {
     FileDelete {
         /// Target file.
         path: PathBuf,
+    },
+    /// Write a raw binary file, creating parent folders if needed.
+    FileWriteBytes {
+        /// Target file.
+        path: PathBuf,
+        /// File contents.
+        bytes: Vec<u8>,
     },
     /// Start a service.
     ServiceStart {
@@ -343,8 +358,12 @@ impl Action {
                 format!("{key}: {name} = {}", value.preview())
             }
             Action::RegistryDelete { key, name } => format!("{key}: delete value {name}"),
+            Action::RegistryDeleteKey { key } => format!("{key}: delete key with all subkeys"),
             Action::FileWrite { path, content } => {
                 format!("write {} ({} bytes)", path.display(), content.len())
+            }
+            Action::FileWriteBytes { path, bytes } => {
+                format!("write {} ({} bytes, binary)", path.display(), bytes.len())
             }
             Action::FileDelete { path } => format!("delete {}", path.display()),
             Action::ServiceStart { service } => format!("start service {service}"),

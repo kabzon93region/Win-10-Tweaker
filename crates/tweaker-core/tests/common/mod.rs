@@ -110,6 +110,11 @@ pub fn seed(harness: &Harness, tweaks: &[TweakDefinition]) {
                     );
                 }
                 Action::TaskSetEnabled { path, .. } => harness.scheduler.add(path, true),
+                Action::RegistryDeleteKey { key } => {
+                    harness
+                        .registry
+                        .set(key, "Seed", tweaker_core::action::RegistryValue::Dword(1))
+                }
                 Action::TaskSetEnabledMatching {
                     folder, prefixes, ..
                 } => {
@@ -153,6 +158,12 @@ pub fn check_item(section_id: &str, id: &str) {
                 Action::RegistrySet { .. } | Action::RegistryDelete { .. },
                 Snapshot::Registry(None),
             ) => {}
+            (Action::RegistryDeleteKey { .. }, Snapshot::RegistryKey(Some(tree))) => {
+                assert!(
+                    !tree.values.is_empty(),
+                    "{id}: the seeded key must have a value"
+                );
+            }
             (
                 Action::ServiceStart { .. }
                 | Action::ServiceStop { .. }
@@ -182,6 +193,7 @@ pub fn check_item(section_id: &str, id: &str) {
                 assert!(text.contains("user line"), "{id}: hosts snapshot: {text:?}");
             }
             (Action::FileWrite { .. } | Action::FileDelete { .. }, Snapshot::TextFile(_)) => {}
+            (Action::FileWriteBytes { .. }, Snapshot::BinaryFile(None)) => {}
             other => panic!("{id}: unexpected state before the action: {other:?}"),
         }
     }

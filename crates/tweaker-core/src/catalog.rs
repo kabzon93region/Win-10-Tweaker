@@ -11,6 +11,7 @@ use crate::model::{DefinitionError, TweakDefinition};
 
 const PRIVACY_JSON: &str = include_str!("../data/tweaks/privacy.json");
 const SERVICES_JSON: &str = include_str!("../data/tweaks/services.json");
+const UI_JSON: &str = include_str!("../data/tweaks/ui.json");
 
 /// Problems found while loading the embedded catalog.
 #[derive(Debug)]
@@ -62,6 +63,11 @@ pub fn load_services() -> Result<Vec<TweakDefinition>, CatalogError> {
     load(SERVICES_JSON, "services")
 }
 
+/// Loads the interface section of the catalog.
+pub fn load_ui() -> Result<Vec<TweakDefinition>, CatalogError> {
+    load(UI_JSON, "ui")
+}
+
 /// Loads a catalog section by its id.
 ///
 /// `Ok(None)` means the section is not a catalog (a tool screen) or its data has
@@ -70,6 +76,7 @@ pub fn load_section(section: &str) -> Result<Option<Vec<TweakDefinition>>, Catal
     match section {
         "privacy" => load_privacy().map(Some),
         "services" => load_services().map(Some),
+        "ui" => load_ui().map(Some),
         _ => Ok(None),
     }
 }
@@ -113,6 +120,19 @@ mod tests {
         "PRIV-09", "PRIV-10", "PRIV-11", "PRIV-12", "PRIV-13", "PRIV-14", "PRIV-15", "PRIV-16",
         "PRIV-17",
     ];
+
+    fn le16(bytes: &[u8], offset: usize) -> u16 {
+        u16::from_le_bytes([bytes[offset], bytes[offset + 1]])
+    }
+
+    fn le32(bytes: &[u8], offset: usize) -> u32 {
+        u32::from_le_bytes([
+            bytes[offset],
+            bytes[offset + 1],
+            bytes[offset + 2],
+            bytes[offset + 3],
+        ])
+    }
 
     #[test]
     fn privacy_catalog_loads_with_known_ids() {
@@ -231,10 +251,63 @@ mod tests {
     }
 
     #[test]
+    fn ui_catalog_loads_with_known_ids() {
+        let tweaks = load_ui().expect("catalog must load");
+        let ids: Vec<&str> = tweaks.iter().map(|tweak| tweak.id.as_str()).collect();
+        assert_eq!(ids.len(), 17);
+        assert_eq!(ids.first(), Some(&"UI-01"));
+        assert_eq!(ids.last(), Some(&"UI-17"));
+        for tweak in &tweaks {
+            assert!(!tweak.actions.is_empty(), "{} has no actions", tweak.id);
+            assert_eq!(tweak.section, "ui");
+        }
+    }
+
+    #[test]
+    fn ui_icon_action_has_a_valid_ico_header() {
+        let tweaks = load_ui().expect("catalog");
+        let tweak = tweaks
+            .iter()
+            .find(|tweak| tweak.id == "UI-06")
+            .expect("UI-06");
+        let bytes = tweak
+            .actions
+            .iter()
+            .find_map(|action| match action {
+                Action::FileWriteBytes { bytes, .. } => Some(bytes),
+                _ => None,
+            })
+            .expect("icon action");
+        assert_eq!(bytes.len(), 1150, "16x16 32bpp icon with one image");
+        // ICONDIR: reserved, type, count.
+        assert_eq!(&bytes[0..4], &[0, 0, 1, 0], "ICO directory");
+        assert_eq!(&bytes[4..6], &[1, 0], "one image");
+        // ICONDIRENTRY: width, height, colors, reserved, planes, bit count.
+        assert_eq!(bytes[6], 16, "16 px wide");
+        assert_eq!(bytes[7], 16, "16 px high");
+        assert_eq!(bytes[8], 0, "no palette");
+        assert_eq!(le16(bytes, 10), 1, "one colour plane");
+        assert_eq!(le16(bytes, 12), 32, "32 bits per pixel");
+        assert_eq!(
+            le32(bytes, 14) as usize,
+            bytes.len() - 6 - 16,
+            "payload size"
+        );
+        assert_eq!(le32(bytes, 18), 22, "payload offset");
+        // BITMAPINFOHEADER.
+        assert_eq!(le32(bytes, 22), 40, "header size");
+        assert_eq!(le32(bytes, 26), 16, "bitmap width");
+        assert_eq!(le32(bytes, 30), 32, "bitmap height (XOR + AND)");
+        assert_eq!(le16(bytes, 34), 1, "planes in the header");
+        assert_eq!(le16(bytes, 36), 32, "bit count in the header");
+    }
+
+    #[test]
     fn catalog_sections_are_available_by_id() {
         assert!(load_section("privacy").expect("privacy").is_some());
         assert!(load_section("services").expect("services").is_some());
-        assert!(load_section("ui").expect("ui").is_none());
+        assert!(load_section("ui").expect("ui").is_some());
+        assert!(load_section("system").expect("system").is_none());
         assert!(load_section("sysinfo").expect("sysinfo").is_none());
     }
 

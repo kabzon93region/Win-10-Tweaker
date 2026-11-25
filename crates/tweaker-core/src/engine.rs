@@ -14,8 +14,8 @@ use crate::action::{
     strip_hosts_block,
 };
 use crate::adapters::{
-    IFileSystem, IProcessRunner, IRegistry, IScheduler, IServiceControl, ServiceState,
-    ServiceStatus, TaskInfo,
+    IFileSystem, IProcessRunner, IRegistry, IScheduler, IServiceControl, RegistryTree,
+    ServiceState, ServiceStatus, TaskInfo,
 };
 use crate::journal::{Journal, Snapshot};
 use crate::model::{Plan, PlanStep, TweakDefinition, TweakState};
@@ -374,9 +374,20 @@ impl<'a> Engine<'a> {
                     .map_err(|error| error.message)?;
                 Ok(current.is_none())
             }
+            Action::RegistryDeleteKey { key } => {
+                let current = self
+                    .registry
+                    .read_tree(key)
+                    .map_err(|error| error.message)?;
+                Ok(current.is_none())
+            }
             Action::FileWrite { path, content } => {
                 let current = self.files.read_text(path).map_err(|error| error.message)?;
                 Ok(current.as_deref() == Some(content.as_str()))
+            }
+            Action::FileWriteBytes { path, bytes } => {
+                let current = self.files.read_bytes(path).map_err(|error| error.message)?;
+                Ok(current.as_deref() == Some(bytes.as_slice()))
             }
             Action::FileDelete { path } => Ok(!self.files.exists(path)),
             Action::ServiceStart { service } => {
@@ -460,9 +471,20 @@ impl<'a> Engine<'a> {
                     .map_err(|error| error.message)?;
                 Ok(Snapshot::Registry(current))
             }
+            Action::RegistryDeleteKey { key } => {
+                let current = self
+                    .registry
+                    .read_tree(key)
+                    .map_err(|error| error.message)?;
+                Ok(Snapshot::RegistryKey(current))
+            }
             Action::FileWrite { path, .. } | Action::FileDelete { path } => {
                 let current = self.files.read_text(path).map_err(|error| error.message)?;
                 Ok(Snapshot::TextFile(current))
+            }
+            Action::FileWriteBytes { path, .. } => {
+                let current = self.files.read_bytes(path).map_err(|error| error.message)?;
+                Ok(Snapshot::BinaryFile(current))
             }
             Action::ServiceStart { service }
             | Action::ServiceStop { service }
@@ -509,9 +531,17 @@ impl<'a> Engine<'a> {
                 .registry
                 .delete(key, name)
                 .map_err(|error| error.message),
+            Action::RegistryDeleteKey { key } => self
+                .registry
+                .delete_tree(key)
+                .map_err(|error| error.message),
             Action::FileWrite { path, content } => self
                 .files
                 .write_text(path, content)
+                .map_err(|error| error.message),
+            Action::FileWriteBytes { path, bytes } => self
+                .files
+                .write_bytes(path, bytes)
                 .map_err(|error| error.message),
             Action::FileDelete { path } => self.files.delete(path).map_err(|error| error.message),
             Action::ServiceStart { service } => {
@@ -608,12 +638,34 @@ impl<'a> Engine<'a> {
                     Err(format!("{key}: value {name} is still present after delete"))
                 }
             }
+            Action::RegistryDeleteKey { key } => {
+                let current = self
+                    .registry
+                    .read_tree(key)
+                    .map_err(|error| error.message)?;
+                if current.is_none() {
+                    Ok(())
+                } else {
+                    Err(format!("{key}: key is still present after delete"))
+                }
+            }
             Action::FileWrite { path, content } => {
                 let current = self.files.read_text(path).map_err(|error| error.message)?;
                 if current.as_deref() == Some(content.as_str()) {
                     Ok(())
                 } else {
                     Err(format!("{}: content differs after write", path.display()))
+                }
+            }
+            Action::FileWriteBytes { path, bytes } => {
+                let current = self.files.read_bytes(path).map_err(|error| error.message)?;
+                if current.as_deref() == Some(bytes.as_slice()) {
+                    Ok(())
+                } else {
+                    Err(format!(
+                        "{}: binary content differs after write",
+                        path.display()
+                    ))
                 }
             }
             Action::FileDelete { path } => {
@@ -701,6 +753,15 @@ impl<'a> Engine<'a> {
                     .delete(key, name)
                     .map_err(|error| error.message),
             },
+            (Action::RegistryDeleteKey { key }, Snapshot::RegistryKey(previous)) => {
+                match previous {
+                    Some(tree) => self.restore_tree(key, tree),
+                    None => self
+                        .registry
+                        .delete_tree(key)
+                        .map_err(|error| error.message),
+                }
+            }
             (
                 Action::FileWrite { path, .. }
                 | Action::FileDelete { path }
@@ -710,6 +771,14 @@ impl<'a> Engine<'a> {
                 Some(content) => self
                     .files
                     .write_text(path, content)
+                    .map_err(|error| error.message),
+                None => self.files.delete(path).map_err(|error| error.message),
+            },
+            (Action::FileWriteBytes { path, .. }, Snapshot::BinaryFile(previous)) => match previous
+            {
+                Some(bytes) => self
+                    .files
+                    .write_bytes(path, bytes)
                     .map_err(|error| error.message),
                 None => self.files.delete(path).map_err(|error| error.message),
             },
@@ -757,6 +826,17 @@ impl<'a> Engine<'a> {
                     Err(format!("{key}: value {name} was not restored"))
                 }
             }
+            (Action::RegistryDeleteKey { key }, Snapshot::RegistryKey(previous)) => {
+                let current = self
+                    .registry
+                    .read_tree(key)
+                    .map_err(|error| error.message)?;
+                if current == *previous {
+                    Ok(())
+                } else {
+                    Err(format!("{key}: key was not restored"))
+                }
+            }
             (
                 Action::FileWrite { path, .. }
                 | Action::FileDelete { path }
@@ -768,6 +848,14 @@ impl<'a> Engine<'a> {
                     Ok(())
                 } else {
                     Err(format!("{}: file was not restored", path.display()))
+                }
+            }
+            (Action::FileWriteBytes { path, .. }, Snapshot::BinaryFile(previous)) => {
+                let current = self.files.read_bytes(path).map_err(|error| error.message)?;
+                if current == *previous {
+                    Ok(())
+                } else {
+                    Err(format!("{}: binary file was not restored", path.display()))
                 }
             }
             (
@@ -806,6 +894,37 @@ impl<'a> Engine<'a> {
             (Action::ProcessRun { .. }, _) => Err("this action cannot be reverted".to_owned()),
             _ => Err("journal snapshot does not match the action".to_owned()),
         }
+    }
+
+    /// Recreates a registry key tree: values first, then subkeys recursively.
+    fn restore_tree(
+        &self,
+        key: &crate::action::RegistryKey,
+        tree: &RegistryTree,
+    ) -> Result<(), String> {
+        if tree.values.is_empty() && tree.subkeys.is_empty() {
+            // An empty key cannot be created through a value write, so create it
+            // with a temporary value and remove that value again.
+            const PROBE: &str = "__WinTweakerRestoreProbe";
+            self.registry
+                .write(key, PROBE, &RegistryValue::Dword(0))
+                .map_err(|error| error.message)?;
+            self.registry
+                .delete(key, PROBE)
+                .map_err(|error| error.message)?;
+            return Ok(());
+        }
+        for (name, value) in &tree.values {
+            self.registry
+                .write(key, name, value)
+                .map_err(|error| error.message)?;
+        }
+        for (name, child) in &tree.subkeys {
+            let child_key =
+                crate::action::RegistryKey::new(key.root, format!("{}\\{name}", key.path));
+            self.restore_tree(&child_key, child)?;
+        }
+        Ok(())
     }
 
     /// Brings a service to the requested run status.
@@ -1214,6 +1333,12 @@ mod tests {
             fn delete(&self, _key: &RegistryKey, _name: &str) -> Result<(), AdapterError> {
                 Err(AdapterError::new("registry is unavailable"))
             }
+            fn read_tree(&self, _key: &RegistryKey) -> Result<Option<RegistryTree>, AdapterError> {
+                Err(AdapterError::new("registry is unavailable"))
+            }
+            fn delete_tree(&self, _key: &RegistryKey) -> Result<(), AdapterError> {
+                Err(AdapterError::new("registry is unavailable"))
+            }
         }
         let dir = temp_dir("engine-snapshot-fail");
         let journal = Journal::new(&dir).expect("journal");
@@ -1259,6 +1384,12 @@ mod tests {
             }
             fn delete(&self, _key: &RegistryKey, _name: &str) -> Result<(), AdapterError> {
                 Err(AdapterError::new("must not delete"))
+            }
+            fn read_tree(&self, _key: &RegistryKey) -> Result<Option<RegistryTree>, AdapterError> {
+                Err(AdapterError::new("must not read trees"))
+            }
+            fn delete_tree(&self, _key: &RegistryKey) -> Result<(), AdapterError> {
+                Err(AdapterError::new("must not delete keys"))
             }
         }
         let dir = temp_dir("engine-snapshot-error");
@@ -1419,6 +1550,90 @@ mod tests {
             harness.registry.get(&key(), "Value"),
             Some(RegistryValue::Dword(5))
         );
+    }
+
+    #[test]
+    fn registry_key_delete_restores_values_and_subkeys() {
+        let harness = Harness::new("registry-key-delete");
+        let parent = key();
+        let child = RegistryKey::new(parent.root, format!(r"{}\child", parent.path));
+        harness
+            .registry
+            .set(&parent, "Value", RegistryValue::Dword(7));
+        harness
+            .registry
+            .set(&parent, "", RegistryValue::String("default".to_owned()));
+        harness
+            .registry
+            .set(&child, "Nested", RegistryValue::String("kept".to_owned()));
+        let engine = harness.engine();
+        let definition = tweak(vec![Action::RegistryDeleteKey {
+            key: parent.clone(),
+        }]);
+        assert_eq!(engine.detect(&definition), TweakState::NotApplied);
+        assert!(engine.apply_tweak(&definition).success());
+        assert_eq!(engine.detect(&definition), TweakState::Applied);
+        assert_eq!(harness.registry.get(&parent, "Value"), None);
+        assert_eq!(harness.registry.get(&child, "Nested"), None);
+
+        let revert = engine.revert("PRIV-01");
+        assert!(revert.success(), "{revert:?}");
+        assert_eq!(engine.detect(&definition), TweakState::NotApplied);
+        assert_eq!(
+            harness.registry.get(&parent, "Value"),
+            Some(RegistryValue::Dword(7))
+        );
+        assert_eq!(
+            harness.registry.get(&parent, ""),
+            Some(RegistryValue::String("default".to_owned()))
+        );
+        assert_eq!(
+            harness.registry.get(&child, "Nested"),
+            Some(RegistryValue::String("kept".to_owned()))
+        );
+    }
+
+    #[test]
+    fn registry_key_delete_restores_an_empty_key() {
+        let harness = Harness::new("registry-empty-key");
+        let parent = RegistryKey::new(RegistryRoot::Hkcu, r"Software\WinTweakerTest\empty");
+        harness.registry.ensure_key(&parent);
+        let engine = harness.engine();
+        let definition = tweak(vec![Action::RegistryDeleteKey {
+            key: parent.clone(),
+        }]);
+        assert_eq!(engine.detect(&definition), TweakState::NotApplied);
+        assert!(engine.apply_tweak(&definition).success());
+        assert_eq!(engine.detect(&definition), TweakState::Applied);
+
+        let revert = engine.revert("PRIV-01");
+        assert!(revert.success(), "{revert:?}");
+        assert_eq!(engine.detect(&definition), TweakState::NotApplied);
+        let restored = harness
+            .registry
+            .read_tree(&parent)
+            .expect("read tree")
+            .expect("the empty key must exist again");
+        assert!(restored.values.is_empty());
+        assert!(restored.subkeys.is_empty());
+    }
+
+    #[test]
+    fn binary_file_write_and_revert() {
+        let harness = Harness::new("file-bytes");
+        let path = PathBuf::from(r"C:\Temp\blank.ico");
+        harness.files.put_bytes(&path, vec![9, 9]);
+        let engine = harness.engine();
+        let definition = tweak(vec![Action::FileWriteBytes {
+            path: path.clone(),
+            bytes: vec![0, 1, 2, 3],
+        }]);
+        assert!(engine.apply_tweak(&definition).success());
+        assert_eq!(harness.files.get_bytes(&path), Some(vec![0, 1, 2, 3]));
+        assert_eq!(engine.detect(&definition), TweakState::Applied);
+        let revert = engine.revert("PRIV-01");
+        assert!(revert.success(), "{revert:?}");
+        assert_eq!(harness.files.get_bytes(&path), Some(vec![9, 9]));
     }
 
     #[test]

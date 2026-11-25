@@ -3,7 +3,7 @@
 Навигация по текущему коду. Источник истины — исходники; карта обновляется на каждом этапе,
 где меняются публичные типы, интерфейсы или поток данных.
 
-Актуально для этапа 5, часть 1 (универсальный экран каталога, разделы `privacy` и `services`).
+Актуально для этапа 5, часть 2 (разделы `privacy`, `services`, `ui`).
 
 ## Crates
 
@@ -17,11 +17,11 @@
 
 | Файл | Публичные элементы | Роль |
 |---|---|---|
-| `src/action.rs` | `RegistryRoot`, `RegistryKey`, `RegistryValue`, `ServiceStartMode`, `Action` (включая `HostsBlock`, `TaskSetEnabled`, `TaskSetEnabledMatching` с `optional`), `render_hosts_block`/`strip_hosts_block`/`hosts_block_applied` | Декларативные действия; `Action::describe()` — предпросмотр, `is_reversible()` |
-| `src/catalog.rs` | `CatalogError`, `load_privacy`, `load_services`, `load_section` | Embedded-каталоги `data/tweaks/{privacy,services}.json`; `load_section` возвращает `None` для инструментов и ещё не заполненных разделов |
-| `src/adapters.rs` | трейты `IRegistry`, `IFileSystem`, `IServiceControl`, `IProcessRunner`, `IFirewall`, `IScheduler`, `IAppx`, `ISystemInfo`; `AdapterError`, `ServiceState`, `ServiceStatus`, `TaskInfo`, `ProcessOutput`, `OsVersion`, `FirewallRule`, `FirewallDirection` | Единственный мост к системе; `IScheduler::list(folder)` — имена задач, `is_enabled`/`set_enabled` — по полному пути |
+| `src/action.rs` | `RegistryRoot`, `RegistryKey`, `RegistryValue`, `ServiceStartMode`, `Action` (включая `HostsBlock`, `TaskSetEnabled`, `TaskSetEnabledMatching`, `RegistryDeleteKey`, `FileWriteBytes`), `render_hosts_block`/`strip_hosts_block`/`hosts_block_applied` | Декларативные действия; `Action::describe()` — предпросмотр, `is_reversible()` |
+| `src/catalog.rs` | `CatalogError`, `load_privacy`, `load_services`, `load_ui`, `load_section` | Embedded-каталоги `data/tweaks/{privacy,services,ui}.json`; `load_section` возвращает `None` для инструментов и ещё не заполненных разделов |
+| `src/adapters.rs` | трейты `IRegistry`, `IFileSystem`, `IServiceControl`, `IProcessRunner`, `IFirewall`, `IScheduler`, `IAppx`, `ISystemInfo`; `AdapterError`, `ServiceState`, `ServiceStatus`, `TaskInfo`, `RegistryTree`, `ProcessOutput`, `OsVersion`, `FirewallRule`, `FirewallDirection` | Единственный мост к системе; `IRegistry::read_tree`/`delete_tree` — снимок и удаление ключа с поддеревом; `IFileSystem::read_bytes`/`write_bytes` — бинарные файлы |
 | `src/model.rs` | `RiskLevel`, `TweakDefinition`, `DefinitionError`, `TweakState`, `PlanStep`, `Plan` | Пункт каталога как данные; валидация id/ключей |
-| `src/journal.rs` | `Snapshot`, `Phase`, `JournalRecord`, `AppliedOp`, `Journal` | JSONL-журнал: две фазы, ротация, чтение, поиск неоткаченных и незавершённых операций |
+| `src/journal.rs` | `Snapshot` (значение, дерево ключа, текст, бинарный файл, служба, задачи), `Phase`, `JournalRecord`, `AppliedOp`, `Journal` | JSONL-журнал: две фазы, ротация, чтение, поиск неоткаченных и незавершённых операций |
 | `src/engine.rs` | `Engine`, `ApplyReport`, `RevertReport`, `FailedAction`, `PlanError`, помощники `registry_set`, `service_start_mode` | detect/plan/apply/revert/revert_pending; `Engine::new(registry, files, services, processes, scheduler, journal)` |
 | `src/fake.rs` | `FakeRegistry`, `FakeFileSystem`, `FakeServiceControl`, `FakeProcessRunner`, `FakeFirewall`, `FakeScheduler`, `FakeAppx`, `FakeSystemInfo` | In-memory адаптеры для тестов |
 | `src/paths.rs` | `ProductPaths` | `%LocalAppData%\WinTweaker\{logs,journal,config,backups}` |
@@ -62,6 +62,7 @@
 | `crates/tweaker-core/tests/common/mod.rs` | Общий harness: фейковая машина, посев состояния по действиям пункта, полный приёмочный цикл (`check_item`) |
 | `crates/tweaker-core/tests/privacy_section.rs` | 17 тестов по пунктам `privacy` + обратимость, недоступность без служб, ошибки записи hosts и реестра |
 | `crates/tweaker-core/tests/services_section.rs` | 24 теста по пунктам `services` + недоступность без службы + восстановление режима запуска |
+| `crates/tweaker-core/tests/ui_section.rs` | 17 тестов по пунктам `ui` + проверка обратимости действий |
 | `crates/*/src/**` (`#[cfg(test)]`) | Юнит-тесты движка, журнала, логгера, каталога, модели, адаптеров Windows, локализации, CLI-режимов |
 
 ## Поток данных
@@ -89,9 +90,10 @@ TweakDefinition (данные каталога, этап 3)
 5. Откат идёт в обратном порядке и тоже проверяется; повторный откат — `nothing_to_revert`.
 6. `ProcessRun` необратим и в откате помечается ошибкой.
 
-## Известные пробелы (на этапе 5, часть 1)
+## Известные пробелы (на этапе 5, часть 2)
 
-- Каталог: `privacy` 17/17, `services` 24/24; `ui`, `system`, `context`, `apps`, `autorun` ещё показывают заглушку.
+- Каталог: `privacy` 17/17, `services` 24/24, `ui` 17/17; `system`, `context`, `apps`, `autorun` ещё показывают заглушку.
+- UI-02/12/13 — документированная часть требований (подмена шрифтов, 8 значений, классическое меню), см. D-25.
 - Применение выполняется в UI-потоке: прогресса и отмены нет (дефект D-2 из `TEST_REPORT.md`, этап 6).
 - Незавершённая операция не предлагается к откату при старте (D-8, этап 6).
 - Защита от второй копии действует в пределах текущей сессии (`Local\`, D-7).
@@ -111,6 +113,7 @@ TweakDefinition (данные каталога, этап 3)
 cargo test --workspace
 cargo test -p tweaker-core --test privacy_section
 cargo test -p tweaker-core --test services_section
+cargo test -p tweaker-core --test ui_section
 cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all -- --check
 ```

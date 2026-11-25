@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use crate::action::{RegistryKey, RegistryValue, ServiceStartMode};
 use crate::adapters::{
     AdapterError, FirewallRule, IAppx, IFileSystem, IFirewall, IProcessRunner, IRegistry,
-    IScheduler, IServiceControl, ISystemInfo, OsVersion, ProcessOutput, ServiceState,
+    IScheduler, IServiceControl, ISystemInfo, OsVersion, ProcessOutput, RegistryTree, ServiceState,
     ServiceStatus,
 };
 
@@ -45,6 +45,14 @@ impl FakeRegistry {
             .borrow()
             .get(&(key.root, key.path.clone()))
             .and_then(|values| values.get(name).cloned())
+    }
+
+    /// Creates an empty key (no values), as some shell keys are.
+    pub fn ensure_key(&self, key: &RegistryKey) {
+        self.values
+            .borrow_mut()
+            .entry((key.root, key.path.clone()))
+            .or_default();
     }
 }
 
@@ -89,12 +97,92 @@ impl IRegistry for FakeRegistry {
         }
         Ok(())
     }
+
+    fn read_tree(&self, key: &RegistryKey) -> Result<Option<RegistryTree>, AdapterError> {
+        let values = self.values.borrow();
+        if !values.contains_key(&(key.root, key.path.clone()))
+            && !values
+                .keys()
+                .any(|(root, path)| *root == key.root && path.starts_with(&child_prefix(&key.path)))
+        {
+            return Ok(None);
+        }
+        Ok(Some(tree_for(key.root, &key.path, &values)))
+    }
+
+    fn delete_tree(&self, key: &RegistryKey) -> Result<(), AdapterError> {
+        if let Some(message) = self.fail.borrow().as_ref() {
+            return Err(failure(message));
+        }
+        if *self.ignore_writes.borrow() {
+            return Ok(());
+        }
+        if key.path.is_empty() {
+            return Err(failure("refusing to delete a registry root"));
+        }
+        let prefix = child_prefix(&key.path);
+        self.values.borrow_mut().retain(|(root, path), _| {
+            *root != key.root || (path != &key.path && !path.starts_with(&prefix))
+        });
+        Ok(())
+    }
+}
+
+fn child_prefix(path: &str) -> String {
+    if path.is_empty() {
+        String::new()
+    } else {
+        format!("{path}\\")
+    }
+}
+
+fn tree_for(
+    root: crate::action::RegistryRoot,
+    base: &str,
+    values: &HashMap<(crate::action::RegistryRoot, String), HashMap<String, RegistryValue>>,
+) -> RegistryTree {
+    let mut own: Vec<(String, RegistryValue)> = values
+        .get(&(root, base.to_owned()))
+        .map(|map| {
+            map.iter()
+                .map(|(name, value)| (name.clone(), value.clone()))
+                .collect()
+        })
+        .unwrap_or_default();
+    own.sort_by(|left, right| left.0.cmp(&right.0));
+
+    let prefix = child_prefix(base);
+    let mut names: std::collections::BTreeMap<String, String> = std::collections::BTreeMap::new();
+    for (root_of_key, path) in values.keys() {
+        if *root_of_key != root || path == base || !path.starts_with(&prefix) {
+            continue;
+        }
+        let rest = &path[prefix.len()..];
+        let Some(first) = rest.split('\\').next() else {
+            continue;
+        };
+        let child_base = if base.is_empty() {
+            first.to_owned()
+        } else {
+            format!("{base}\\{first}")
+        };
+        names.insert(first.to_owned(), child_base);
+    }
+    let subkeys = names
+        .into_iter()
+        .map(|(name, child_base)| (name, tree_for(root, &child_base, values)))
+        .collect();
+    RegistryTree {
+        values: own,
+        subkeys,
+    }
 }
 
 /// In-memory text file system.
 #[derive(Default)]
 pub struct FakeFileSystem {
     files: RefCell<HashMap<PathBuf, String>>,
+    bytes: RefCell<HashMap<PathBuf, Vec<u8>>>,
     /// When set, every write and delete fails with this text.
     pub fail: RefCell<Option<String>>,
 }
@@ -105,15 +193,25 @@ impl FakeFileSystem {
         self.files.borrow_mut().insert(path.into(), content.into());
     }
 
+    /// Preloads a binary file.
+    pub fn put_bytes(&self, path: impl Into<PathBuf>, content: impl Into<Vec<u8>>) {
+        self.bytes.borrow_mut().insert(path.into(), content.into());
+    }
+
     /// Reads a file directly (test assertions).
     pub fn get(&self, path: &Path) -> Option<String> {
         self.files.borrow().get(path).cloned()
+    }
+
+    /// Reads binary contents directly (test assertions).
+    pub fn get_bytes(&self, path: &Path) -> Option<Vec<u8>> {
+        self.bytes.borrow().get(path).cloned()
     }
 }
 
 impl IFileSystem for FakeFileSystem {
     fn exists(&self, path: &Path) -> bool {
-        self.files.borrow().contains_key(path)
+        self.files.borrow().contains_key(path) || self.bytes.borrow().contains_key(path)
     }
 
     fn read_text(&self, path: &Path) -> Result<Option<String>, AdapterError> {
@@ -130,11 +228,26 @@ impl IFileSystem for FakeFileSystem {
         Ok(())
     }
 
+    fn read_bytes(&self, path: &Path) -> Result<Option<Vec<u8>>, AdapterError> {
+        Ok(self.get_bytes(path))
+    }
+
+    fn write_bytes(&self, path: &Path, bytes: &[u8]) -> Result<(), AdapterError> {
+        if let Some(message) = self.fail.borrow().as_ref() {
+            return Err(failure(message));
+        }
+        self.bytes
+            .borrow_mut()
+            .insert(path.to_path_buf(), bytes.to_vec());
+        Ok(())
+    }
+
     fn delete(&self, path: &Path) -> Result<(), AdapterError> {
         if let Some(message) = self.fail.borrow().as_ref() {
             return Err(failure(message));
         }
         self.files.borrow_mut().remove(path);
+        self.bytes.borrow_mut().remove(path);
         Ok(())
     }
 }

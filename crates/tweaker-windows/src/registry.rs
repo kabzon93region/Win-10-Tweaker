@@ -4,7 +4,7 @@ use std::borrow::Cow;
 use std::io;
 
 use tweaker_core::action::{RegistryKey, RegistryRoot, RegistryValue};
-use tweaker_core::adapters::{AdapterError, IRegistry};
+use tweaker_core::adapters::{AdapterError, IRegistry, RegistryTree};
 use winreg::RegKey;
 use winreg::RegValue;
 use winreg::enums::{
@@ -74,6 +74,59 @@ impl IRegistry for WindowsRegistry {
             ))),
         }
     }
+
+    fn read_tree(&self, key: &RegistryKey) -> Result<Option<RegistryTree>, AdapterError> {
+        let root = predef(key.root);
+        match root.open_subkey(&key.path) {
+            Ok(subkey) => read_tree_of(&subkey, key).map(Some),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+            Err(error) => Err(AdapterError::new(format!(
+                "{key}: cannot open key: {error}"
+            ))),
+        }
+    }
+
+    fn delete_tree(&self, key: &RegistryKey) -> Result<(), AdapterError> {
+        if key.path.is_empty() {
+            return Err(AdapterError::new("refusing to delete a registry root"));
+        }
+        let root = predef(key.root);
+        match root.delete_subkey_all(&key.path) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(AdapterError::new(format!(
+                "{key}: cannot delete key: {error}"
+            ))),
+        }
+    }
+}
+
+/// Reads one key and everything below it.
+fn read_tree_of(subkey: &RegKey, key: &RegistryKey) -> Result<RegistryTree, AdapterError> {
+    let mut values = std::collections::BTreeMap::new();
+    for entry in subkey.enum_values() {
+        let (name, raw) = entry.map_err(|error| {
+            AdapterError::new(format!("{key}: cannot enumerate values: {error}"))
+        })?;
+        values.insert(name, decode(&raw)?);
+    }
+    if let Ok(raw) = subkey.get_raw_value("") {
+        values.insert(String::new(), decode(&raw)?);
+    }
+    let values = values.into_iter().collect();
+
+    let mut subkeys = Vec::new();
+    for name in subkey.enum_keys() {
+        let name = name.map_err(|error| {
+            AdapterError::new(format!("{key}: cannot enumerate subkeys: {error}"))
+        })?;
+        let child_key = RegistryKey::new(key.root, format!("{}\\{name}", key.path));
+        let child = subkey
+            .open_subkey(&name)
+            .map_err(|error| AdapterError::new(format!("{child_key}: cannot open key: {error}")))?;
+        subkeys.push((name, read_tree_of(&child, &child_key)?));
+    }
+    Ok(RegistryTree { values, subkeys })
 }
 
 fn predef(root: RegistryRoot) -> RegKey {
@@ -249,6 +302,31 @@ mod tests {
         if let Ok(software) = hkcu.open_subkey_with_flags("Software", KEY_ALL_ACCESS) {
             let _ = software.delete_subkey("WinTweakerTests");
         }
+    }
+
+    #[test]
+    fn reads_a_real_key_tree() {
+        let registry = WindowsRegistry;
+        let key = RegistryKey::new(
+            RegistryRoot::Hkcu,
+            r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+        );
+        let tree = registry
+            .read_tree(&key)
+            .expect("read tree")
+            .expect("the key exists");
+        assert!(!tree.values.is_empty(), "expected values in the key");
+        assert!(
+            tree.values.iter().any(|(name, _)| name == "HideFileExt"),
+            "expected the known value"
+        );
+    }
+
+    #[test]
+    fn refuses_to_delete_a_registry_root() {
+        let registry = WindowsRegistry;
+        let root = RegistryKey::new(RegistryRoot::Hkcu, "");
+        assert!(registry.delete_tree(&root).is_err());
     }
 
     #[test]

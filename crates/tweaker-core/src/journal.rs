@@ -15,7 +15,7 @@ use chrono::{SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::action::{Action, RegistryValue};
-use crate::adapters::{ServiceState, TaskInfo};
+use crate::adapters::{RegistryTree, ServiceState, TaskInfo};
 use crate::logging;
 
 /// Name of the active journal file.
@@ -30,8 +30,12 @@ const DEFAULT_KEEP_FILES: usize = 5;
 pub enum Snapshot {
     /// Registry value; `None` means the value did not exist.
     Registry(Option<RegistryValue>),
+    /// Whole registry key tree; `None` means the key did not exist.
+    RegistryKey(Option<RegistryTree>),
     /// Text file contents; `None` means the file did not exist.
     TextFile(Option<String>),
+    /// Binary file contents; `None` means the file did not exist.
+    BinaryFile(Option<Vec<u8>>),
     /// Service state.
     Service(Option<ServiceState>),
     /// Scheduled tasks and their enabled state.

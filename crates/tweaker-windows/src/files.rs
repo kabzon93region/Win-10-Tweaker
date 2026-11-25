@@ -29,6 +29,21 @@ impl IFileSystem for WindowsFileSystem {
     }
 
     fn write_text(&self, path: &Path, content: &str) -> Result<(), AdapterError> {
+        self.write_bytes(path, content.as_bytes())
+    }
+
+    fn read_bytes(&self, path: &Path) -> Result<Option<Vec<u8>>, AdapterError> {
+        match fs::read(path) {
+            Ok(bytes) => Ok(Some(bytes)),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+            Err(error) => Err(AdapterError::new(format!(
+                "cannot read {}: {error}",
+                path.display()
+            ))),
+        }
+    }
+
+    fn write_bytes(&self, path: &Path, bytes: &[u8]) -> Result<(), AdapterError> {
         if let Some(parent) = path.parent()
             && !parent.as_os_str().is_empty()
         {
@@ -36,7 +51,7 @@ impl IFileSystem for WindowsFileSystem {
                 AdapterError::new(format!("cannot create {}: {error}", parent.display()))
             })?;
         }
-        fs::write(path, content)
+        fs::write(path, bytes)
             .map_err(|error| AdapterError::new(format!("cannot write {}: {error}", path.display())))
     }
 
@@ -83,6 +98,19 @@ mod tests {
         files.delete(&path).expect("delete");
         assert!(!files.exists(&path));
         files.delete(&path).expect("second delete");
+        fs::remove_dir_all(&dir).expect("cleanup");
+    }
+
+    #[test]
+    fn binary_round_trip() {
+        let dir = test_dir("binary");
+        let path = dir.join("icon.ico");
+        let files = WindowsFileSystem;
+        let bytes = vec![0u8, 1, 2, 255];
+        files.write_bytes(&path, &bytes).expect("write bytes");
+        assert_eq!(files.read_bytes(&path).expect("read"), Some(bytes));
+        files.delete(&path).expect("delete");
+        assert_eq!(files.read_bytes(&path).expect("read"), None);
         fs::remove_dir_all(&dir).expect("cleanup");
     }
 }
