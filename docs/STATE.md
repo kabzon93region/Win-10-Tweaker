@@ -9,6 +9,7 @@
 | Этап | 1 — каркас решения (завершён); следующий — 2 (движок apply/detect/revert) |
 | Код | `Cargo.toml`, `crates/tweaker-core`, `crates/tweaker-windows`, `crates/tweaker-app` |
 | Версия | 0.1.0 |
+| Git | `88de898f806ff53ebcdd7e1d8b26cfc9097ed8e4` (этап 1) |
 | Сборка | `cargo build --workspace` — успешно; `cargo build --release -p tweaker-app` — успешно (чистая сборка 1 мин 11 с, повторная 20 с) |
 | Артефакт | `target/release/wintweaker.exe` — 6 187 520 байт, sha256 `38C953E9CE9D34E6D79B38F4911A880783094C6C98750351B0532D1A794CFF3C` |
 | Тесты | `cargo test --workspace` — 44 passed, 0 failed |
