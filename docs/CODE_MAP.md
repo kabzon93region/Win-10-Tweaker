@@ -24,6 +24,7 @@
 | `src/journal.rs` | `Snapshot` (значение, дерево ключа, текст, бинарный файл, служба, задачи, пакет), `Phase`, `JournalRecord`, `AppliedOp`, `Journal` | JSONL-журнал: две фазы, ротация, чтение, поиск неоткаченных и незавершённых операций |
 | `src/engine.rs` | `Engine`, `ApplyReport` (включая `cancelled`, `freed_bytes`, `skipped_files`), `RevertReport`, `FailedAction`, `PlanError`, помощники `registry_set`, `service_start_mode` | detect/plan/apply/apply_with/revert/revert_pending; `Engine::new(registry, files, services, processes, scheduler, journal)` + `with_appx(&dyn IAppx)` |
 | `src/fake.rs` | `FakeRegistry`, `FakeFileSystem`, `FakeServiceControl`, `FakeProcessRunner`, `FakeFirewall`, `FakeScheduler`, `FakeAppx`, `FakeSystemInfo` | In-memory адаптеры для тестов |
+| `src/profile.rs` | `Profile`, `ProfileError`, `export`, `parse` | JSON профиля: версия и список ID, без значений |
 | `src/paths.rs` | `ProductPaths` | `%LocalAppData%\WinTweaker\{logs,journal,config,backups}` |
 | `src/logging.rs` | `Level`, `Logger`, `LoggerConfig`, `mask_secret` | Лог с ротацией, буфер строк при недоступном файле |
 | `src/sections.rs` | `Section`, `SectionKind` | Каталог разделов из `data/sections.json` |
@@ -51,7 +52,7 @@
 | Файл | Элементы | Роль |
 |---|---|---|
 | `src/main.rs` | `Mode`, `parse_args` | `--selftest`, `--smoke`, `--screenshot <png>`, `--section <id>`, `--version`, `--help` |
-| `src/app.rs` | публичные `RunMode`, `install_style`; приватные `TweakerApp` (реализует `eframe::App`), `CatalogView`, `CatalogAction`, `StartupView`, `StartupAction`, `AppsView`, `AppsAction`, `AppsPending`, `ApplyJob`, `JobProgress`, `TweakOutcome`, `SysinfoView`, `load_catalog`, `select_section`, `save_screenshot` | Окно, меню 14 разделов, универсальный экран каталога, экран автозагрузки, экран приложений, экран системной информации (копирование/сохранение), фоновое применение с прогрессом и отменой, баннер незавершённых операций, защита от второй копии окна, статус-бар, режим снимка + watchdog |
+| `src/app.rs` | публичные `RunMode`, `install_style`; приватные `TweakerApp` (реализует `eframe::App`), `CatalogView`, `CatalogAction`, `StartupView`, `StartupAction`, `AppsView`, `AppsAction`, `AppsPending`, `ApplyJob`, `JobProgress`, `TweakOutcome`, `SysinfoView`, `ProfileAction`, `load_catalog`, `select_section`, `save_screenshot` | Окно, меню 14 разделов, универсальный экран каталога, экран автозагрузки, экран приложений, экран системной информации (копирование/сохранение), экспорт/импорт профиля в about, фоновое применение с прогрессом и отменой, баннер незавершённых операций, защита от второй копии окна, статус-бар, режим снимка + watchdog |
 | `examples/tweak_probe.rs` | `main`, `run` | Живая проба одного пункта каталога вне окна; в релиз не входит |
 | `src/i18n.rs` | `Localizer`, `detect_lang` | ru/en из embedded JSON, форматирование `{placeholders}` |
 | `src/selftest.rs` | `run` | Проверки без окна: пути, лог, локализация, разделы, права, ОС |
@@ -69,11 +70,12 @@
 | `crates/tweaker-core/tests/context_section.rs` | 15 тестов по пунктам `context` + проверка обратимости, команд без `%~`, скриптов брандмауэра/ссылок |
 | Автозагрузка | `startup.rs` (5 тестов), `app.rs` (4 теста действий) | пять источников, состояние `StartupApproved`, адреса ключей удаления |
 | `crates/tweaker-core/tests/apps_section.rs` | 24 теста по пунктам `apps` + проверка семейств пакетов |
-| `crates/tweaker-core/tests/cleaner_section.rs` | 16 тестов по пунктам `cleaner` + абсолютные пути/переменные среды + критические пункты |
+| `crates/tweaker-core/tests/cleaner_section.rs` | 19 тестов по пунктам `cleaner` + абсолютные пути/переменные среды + критические пункты |
 | `crates/tweaker-core/tests/optimization_section.rs` | 4 теста по пунктам `optimization` + белый список программ |
 | Приложения | `appx.rs` (3 теста), `engine.rs` (круговой тест `AppxRemove`) | поиск пакета, семейство из полного имени, удаление и регистрация манифеста |
 | Обслуживание/сервис | `maintenance_section.rs` (6), `backup_section.rs` (4) | команды FIX и BKP, обратимость, применение только по явной команде |
 | Системная информация | `os.rs` (2 теста отчёта) | разбор CIM-JSON, живой отчёт с ОС и CPU |
+| Профиль | `profile.rs` (4 теста) | экспорт/разбор JSON, пустой и битый файл, версия |
 | `crates/*/src/**` (`#[cfg(test)]`) | Юнит-тесты движка, журнала, логгера, каталога, модели, адаптеров Windows, локализации, CLI-режимов |
 
 ## Поток данных
@@ -104,8 +106,8 @@ TweakDefinition (данные каталога, этап 3)
 ## Известные пробелы (на этапе 7)
 
 - Подмножество требований очистки/оптимизации зафиксировано в D-39/D-45: OPT-01/03 без выбора алгоритма, CLN-11 — 5 корней, CLN-04 без Firefox/Cent.
-- Профиль и проверка обновлений не выведены в меню, VirusTotal показывает заглушку — до ответов D-46…D-48.
-- Каталог: `privacy` 17/17, `services` 24/24, `ui` 17/17, `system` 18/18, `context` 15/17 (CTX-07/08 исключены), `apps` 24/24, `cleaner` 16/18, `optimization` 4/6 (D-39), `backup` 4/4, `maintenance` 6/6; `autorun` — динамический экран на 5 источников.
+- Профиль выведен в about (D-50); проверка обновлений ждёт URL (D-52), VirusTotal показывает заглушку (D-47).
+- Каталог: `privacy` 17/17, `services` 24/24, `ui` 17/17, `system` 18/18, `context` 15/17 (CTX-07/08 исключены), `apps` 24/24, `cleaner` 17/18, `optimization` 4/6 (D-39), `backup` 4/4, `maintenance` 6/6; `autorun` — динамический экран на 5 источников.
 - UI-02/12/13 — документированная часть требований (подмена шрифтов, 8 значений, классическое меню), см. D-25.
 - Отмена длительной операции не прерывает уже запущенную команду (`compact`/`dism`), только следующие действия (D-38).
 - Баннер незавершённых операций проверен чтением кода; живой сценарий сбоя не воспроизводился.

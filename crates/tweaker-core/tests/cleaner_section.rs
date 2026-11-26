@@ -18,6 +18,7 @@ item_test!(cleaner_13_temporary, "cleaner", "CLN-13");
 item_test!(cleaner_14_diagnostics, "cleaner", "CLN-14");
 item_test!(cleaner_15_reports, "cleaner", "CLN-15");
 item_test!(cleaner_16_languages, "cleaner", "CLN-16");
+item_test!(cleaner_17_service_acl, "cleaner", "CLN-17");
 
 #[test]
 fn cleanup_paths_are_absolute_or_use_environment_variables() {

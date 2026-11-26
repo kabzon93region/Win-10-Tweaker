@@ -16,6 +16,7 @@ pub mod logging;
 pub mod model;
 pub mod paths;
 pub mod product;
+pub mod profile;
 pub mod sections;
 
 #[cfg(test)]
@@ -38,4 +39,5 @@ pub use logging::{Level, Logger, LoggerConfig};
 pub use model::{Plan, PlanStep, RiskLevel, TweakDefinition, TweakState};
 pub use paths::ProductPaths;
 pub use product::{PRODUCT_DIR_NAME, PRODUCT_NAME, PRODUCT_VERSION};
+pub use profile::{Profile, ProfileError};
 pub use sections::{Section, SectionKind};

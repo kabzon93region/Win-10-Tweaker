@@ -298,5 +298,27 @@
         "args": ["/c", "start", "", "ms-settings:regionlanguage"]
       }
     ]
+  },
+  {
+    "id": "CLN-17",
+    "section": "cleaner",
+    "titleKey": "tweak.CLN-17.title",
+    "descriptionKey": "tweak.CLN.description",
+    "risk": "high",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "process_run",
+        "program": "powershell.exe",
+        "args": [
+          "-NoProfile",
+          "-NonInteractive",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-Command",
+          "$dirs=@(\"$env:SystemRoot\\Temp\",\"$env:SystemRoot\\SoftwareDistribution\\Download\");foreach($d in $dirs){if(Test-Path -LiteralPath $d){icacls $d /grant \"*S-1-5-32-545:(OI)(CI)M\" /T /C /Q | Out-Null}}"
+        ]
+      }
+    ]
   }
 ]

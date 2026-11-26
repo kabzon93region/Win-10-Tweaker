@@ -300,6 +300,9 @@ struct TweakerApp {
     apps: AppsView,
     job: Option<ApplyJob>,
     sysinfo: SysinfoView,
+    profile_report: Option<String>,
+    profile_preview: Vec<String>,
+    profile_pending: Vec<String>,
     recovery_report: Option<Vec<String>>,
     pending_recovery: Option<usize>,
 }
@@ -320,13 +323,18 @@ enum AppsPending {
 }
 
 /// One long-running apply job executed off the UI thread.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum JobTarget {
+    Catalog,
+    Profile,
+}
+
 struct ApplyJob {
+    target: JobTarget,
     progress: Arc<Mutex<JobProgress>>,
     cancel: Arc<AtomicBool>,
     outcome: Arc<Mutex<Option<JobOutcome>>>,
 }
-
-/// Live progress of the background job.
 #[derive(Default, Clone)]
 struct JobProgress {
     index: usize,
@@ -394,6 +402,12 @@ struct CatalogView {
 }
 
 /// One click on a catalog screen.
+enum ProfileAction {
+    Export,
+    Import,
+    Confirm,
+    Cancel,
+}
 enum CatalogAction {
     Refresh,
     Measure,
@@ -527,9 +541,12 @@ impl TweakerApp {
             sysinfo: SysinfoView::default(),
             pending_recovery,
             recovery_report: None,
+            profile_report: None,
+            profile_preview: Vec::new(),
+            profile_pending: Vec::new(),
         }
     }
-    /// Switches the visible section and loads its catalog data when needed.
+
     fn select_section(&mut self, index: usize) {
         if index == self.selected {
             return;
@@ -721,6 +738,7 @@ impl TweakerApp {
     }
 
     fn draw_central(&mut self, ui: &mut egui::Ui) {
+        self.poll_job();
         let section = self.sections[self.selected].clone();
         let title = self.loc.t(&section.title_key);
         let hint = self.loc.t(&section.hint_key);
@@ -741,6 +759,7 @@ impl TweakerApp {
         };
         let about_title = self.loc.t("about.title");
         let mut recovery_action: Option<bool> = None;
+        let mut profile_action: Option<ProfileAction> = None;
 
         egui::CentralPanel::default().show(ui, |ui| {
             egui::ScrollArea::vertical()
@@ -812,6 +831,33 @@ impl TweakerApp {
                                     for line in &about_lines {
                                         ui.label(line);
                                     }
+                                    ui.add_space(8.0);
+                                    ui.horizontal(|ui| {
+                                        if ui.button(self.loc.t("profile.export")).clicked() {
+                                            profile_action = Some(ProfileAction::Export);
+                                        }
+                                        if ui.button(self.loc.t("profile.import")).clicked() {
+                                            profile_action = Some(ProfileAction::Import);
+                                        }
+                                    });
+                                    if !self.profile_preview.is_empty() {
+                                        ui.add_space(6.0);
+                                        for line in &self.profile_preview {
+                                            ui.label(line);
+                                        }
+                                        ui.horizontal(|ui| {
+                                            if ui.button(self.loc.t("profile.confirm")).clicked() {
+                                                profile_action = Some(ProfileAction::Confirm);
+                                            }
+                                            if ui.button(self.loc.t("autorun.cancel")).clicked() {
+                                                profile_action = Some(ProfileAction::Cancel);
+                                            }
+                                        });
+                                    }
+                                    if let Some(report) = &self.profile_report {
+                                        ui.add_space(6.0);
+                                        ui.label(report);
+                                    }
                                 } else {
                                     ui.label(
                                         egui::RichText::new(placeholder_title).size(16.0).strong(),
@@ -832,6 +878,16 @@ impl TweakerApp {
             Some(false) => {
                 self.pending_recovery = None;
                 self.recovery_report = None;
+            }
+            None => {}
+        }
+        match profile_action {
+            Some(ProfileAction::Export) => self.export_profile(),
+            Some(ProfileAction::Import) => self.prepare_profile_import(),
+            Some(ProfileAction::Confirm) => self.confirm_profile_import(),
+            Some(ProfileAction::Cancel) => {
+                self.profile_preview.clear();
+                self.profile_pending.clear();
             }
             None => {}
         }
@@ -1115,6 +1171,169 @@ impl TweakerApp {
         self.apps.states = states;
     }
 
+    /// All catalog tweaks of every section, for profile export and import.
+    fn all_tweaks(&self) -> Vec<TweakDefinition> {
+        let mut all = Vec::new();
+        for section in &self.sections {
+            if let Ok(Some(tweaks)) = catalog::load_section(&section.id) {
+                all.extend(tweaks);
+            }
+        }
+        all
+    }
+
+    /// Writes the ids of all currently applied tweaks to `config\profile.json`.
+    fn export_profile(&mut self) {
+        let Some(journal) = self.journal.as_ref() else {
+            self.profile_report = Some(self.loc.t("profile.no_journal"));
+            return;
+        };
+        let tweaks = self.all_tweaks();
+        let ids: Vec<String> = {
+            let engine = Engine::new(
+                &self.registry,
+                &self.files,
+                &self.services,
+                &self.processes,
+                &self.scheduler,
+                journal,
+            )
+            .with_appx(&self.appx);
+            tweaks
+                .iter()
+                .filter(|tweak| matches!(engine.detect(tweak), TweakState::Applied))
+                .map(|tweak| tweak.id.clone())
+                .collect()
+        };
+        if ids.is_empty() {
+            self.profile_report = Some(self.loc.t("profile.empty_export"));
+            return;
+        }
+        let path = self.paths.config().join("profile.json");
+        if let Some(parent) = path.parent()
+            && let Err(error) = std::fs::create_dir_all(parent)
+        {
+            self.profile_report = Some(
+                self.loc
+                    .fmt("profile.error", &[("reason", &error.to_string())]),
+            );
+            return;
+        }
+        match std::fs::write(&path, tweaker_core::profile::export(&ids)) {
+            Ok(()) => {
+                self.profile_report = Some(self.loc.fmt(
+                    "profile.exported",
+                    &[
+                        ("count", &ids.len().to_string()),
+                        ("path", &path.display().to_string()),
+                    ],
+                ));
+            }
+            Err(error) => {
+                self.profile_report = Some(
+                    self.loc
+                        .fmt("profile.error", &[("reason", &error.to_string())]),
+                );
+            }
+        }
+    }
+
+    /// Reads the profile and shows a preview before anything is applied.
+    fn prepare_profile_import(&mut self) {
+        let path = self.paths.config().join("profile.json");
+        let text = match std::fs::read_to_string(&path) {
+            Ok(text) => text,
+            Err(error) => {
+                self.profile_report = Some(self.loc.fmt(
+                    "profile.error",
+                    &[("reason", &format!("{}: {error}", path.display()))],
+                ));
+                return;
+            }
+        };
+        let ids = match tweaker_core::profile::parse(&text) {
+            Ok(ids) => ids,
+            Err(error) => {
+                self.profile_report = Some(
+                    self.loc
+                        .fmt("profile.error", &[("reason", &error.to_string())]),
+                );
+                return;
+            }
+        };
+        let all = self.all_tweaks();
+        let mut preview = Vec::new();
+        let mut pending = Vec::new();
+        for id in &ids {
+            match all.iter().find(|tweak| &tweak.id == id) {
+                Some(tweak) => {
+                    preview.push(format!("{}: {}", id, self.loc.t(&tweak.title_key)));
+                    pending.push(id.clone());
+                }
+                None => preview.push(format!("{id}: {}", self.loc.t("profile.unknown_id"))),
+            }
+        }
+        let skipped = ids.len().saturating_sub(pending.len());
+        self.profile_pending = pending;
+        self.profile_preview = preview;
+        let mut message = self.loc.fmt(
+            "profile.preview",
+            &[("count", &self.profile_pending.len().to_string())],
+        );
+        if skipped > 0 {
+            message.push(' ');
+            message.push_str(
+                &self
+                    .loc
+                    .fmt("profile.skipped", &[("count", &skipped.to_string())]),
+            );
+        }
+        self.profile_report = Some(message);
+    }
+
+    /// Applies the imported ids in the background, one planned tweak each.
+    fn confirm_profile_import(&mut self) {
+        if self.job.is_some() {
+            self.profile_report = Some(self.loc.t("job.busy"));
+            return;
+        }
+        let ids = std::mem::take(&mut self.profile_pending);
+        self.profile_preview.clear();
+        if ids.is_empty() {
+            return;
+        }
+        let Some(journal) = self.journal.as_ref() else {
+            self.profile_report = Some(self.loc.t("profile.no_journal"));
+            return;
+        };
+        let all = self.all_tweaks();
+        let mut jobs = Vec::new();
+        {
+            let engine = Engine::new(
+                &self.registry,
+                &self.files,
+                &self.services,
+                &self.processes,
+                &self.scheduler,
+                journal,
+            )
+            .with_appx(&self.appx);
+            for id in ids {
+                if let Some(tweak) = all.iter().find(|tweak| tweak.id == id)
+                    && let Ok(plan) = engine.plan(tweak)
+                    && !plan.is_empty()
+                {
+                    jobs.push((tweak.clone(), plan));
+                }
+            }
+        }
+        if jobs.is_empty() {
+            self.profile_report = Some(self.loc.t("profile.nothing_to_apply"));
+            return;
+        }
+        self.start_apply_jobs(JobTarget::Profile, jobs);
+        self.profile_report = Some(self.loc.t("profile.applying"));
+    }
     /// Reloads the system information report.
     fn refresh_sysinfo(&mut self) {
         self.sysinfo.loaded = true;
@@ -1436,7 +1655,7 @@ impl TweakerApp {
     }
 
     /// Starts a background run over already planned tweaks.
-    fn start_apply_jobs(&mut self, jobs: Vec<(TweakDefinition, Plan)>) {
+    fn start_apply_jobs(&mut self, target: JobTarget, jobs: Vec<(TweakDefinition, Plan)>) {
         let Some(journal) = self.journal.as_ref().map(Arc::clone) else {
             let reason = "the change journal is unavailable".to_owned();
             self.catalog.report = Some(vec![
@@ -1507,12 +1726,12 @@ impl TweakerApp {
             }
         });
         self.job = Some(ApplyJob {
+            target,
             progress,
             cancel,
             outcome,
         });
     }
-
     /// Collects the background result when it is ready and refreshes the states.
     fn poll_job(&mut self) {
         let Some(job) = self.job.as_ref() else {
@@ -1528,6 +1747,7 @@ impl TweakerApp {
         let Some(outcome) = outcome else {
             return;
         };
+        let target = job.target;
         self.job = None;
         let mut lines = Vec::new();
         let mut cancelled = false;
@@ -1540,6 +1760,7 @@ impl TweakerApp {
                 ));
                 continue;
             }
+
             lines.push(format!(
                 "{title}: +{} / ={} / !{}",
                 item.applied,
@@ -1572,8 +1793,12 @@ impl TweakerApp {
         if cancelled {
             lines.push(self.loc.t("job.cancelled"));
         }
-        self.catalog.report = Some(lines);
-        self.refresh_catalog_states();
+        if target == JobTarget::Profile {
+            self.profile_report = Some(lines.join("\n"));
+        } else {
+            self.catalog.report = Some(lines);
+            self.refresh_catalog_states();
+        }
     }
 
     fn draw_catalog(&mut self, ui: &mut egui::Ui) {
@@ -1968,7 +2193,7 @@ impl TweakerApp {
             self.catalog.report = Some(lines);
             return;
         }
-        self.start_apply_jobs(jobs);
+        self.start_apply_jobs(JobTarget::Catalog, jobs);
         self.catalog.report = None;
     }
 

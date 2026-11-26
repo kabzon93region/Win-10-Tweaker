@@ -390,5 +390,18 @@
   "tweak.BKP-01.title": "Restore point",
   "tweak.BKP-02.title": "System Restore",
   "tweak.BKP-03.title": "Export drivers",
-  "tweak.BKP-04.title": "Import drivers"
+  "tweak.BKP-04.title": "Import drivers",
+  "profile.export": "Export profile",
+  "profile.import": "Import profile",
+  "profile.exported": "Profile saved: {count} items, {path}",
+  "profile.error": "Error: {reason}",
+  "profile.preview": "Profile loaded: {count} items. Review the list and confirm.",
+  "profile.unknown_id": "unknown item, will be skipped",
+  "profile.applying": "Applying the profile…",
+  "profile.confirm": "Apply",
+  "profile.no_journal": "The journal is unavailable, the profile was not changed.",
+  "tweak.CLN-17.title": "Permissions on service folders",
+  "profile.empty_export": "There are no applied items to export.",
+  "profile.skipped": "Skipped unknown items: {count}.",
+  "profile.nothing_to_apply": "All profile items are already applied."
 }

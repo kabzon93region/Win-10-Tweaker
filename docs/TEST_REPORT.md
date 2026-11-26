@@ -65,7 +65,7 @@ apply/revert/restore/verify имеет отдельный тест или про
 | 5.4 | Отмена длительной операции | отложено | отмены пока нет — дефект D-2, этап 6 |
 | 5.5 | Ошибка записи в реестр | пройдено | `registry_write_failure_is_reported`, `apply_continues_after_a_failed_action` |
 | 5.6 | Прерывание процесса | частично | журнал переживает перезапуск и умеет откатывать незавершённую операцию (`pending_operation_can_be_reverted`, `journal_survives_restart_between_apply_and_revert`), но окно при старте не предлагает это сделать — дефект D-8, этап 6 |
-| 5.7 | Некорректный профиль импорта | отложено | импорта ещё нет (этап 7) |
+| 5.7 | Некорректный профиль импорта | пройдено | `profile::parse` отвергает пустой, битый и новый формат (4 теста); импорт показывает предпросмотр |
 | 5.8 | Подделанный манифест обновления | отложено | обновлений ещё нет (этап 7) |
 
 ### §6 Опасные операции (🔴)
@@ -134,12 +134,12 @@ apply/revert/restore/verify имеет отдельный тест или про
 
 | Показатель | Значение |
 |---|---|
-| `cargo test --workspace` | 331 passed, 1 ignored (app 24, core 105, core-tests: apps 25, backup 4, cleaner 18, context 18, maintenance 6, optimization 5, privacy 21, services 26, system 22, ui 18, windows 39) |
+| `cargo test --workspace` | 336 passed, 1 ignored (app 24, core 109, core-tests: apps 25, backup 4, cleaner 19, context 18, maintenance 6, optimization 5, privacy 21, services 26, system 22, ui 18, windows 39) |
 | `cargo clippy --workspace --all-targets -- -D warnings` | rc=0 |
 | `cargo fmt --all -- --check` | rc=0 |
 | `cargo build --release -p tweaker-app --locked` | успешно, повторная сборка даёт тот же файл |
-| Release-бинарник | 7 438 336 байт, sha256 `BBD3E4C4062E83E65CCD4DFFC57D154B7C21D785BEF2AAB6A46327D11B59524A` |
-| `--selftest` (release) | rc=0, 414 мс; 392 ключа ru/en, 14 разделов, права администратора, Windows 10 Pro 22H2 (19045.6456) |
+| Release-бинарник | 7 470 080 байт, sha256 `DC1127131D83E1A2D61531E7D641019C5CF349DCB4F7CDDEB4ABB76DC1C065C8` |
+| `--selftest` (release) | rc=0; 405 ключей ru/en, 14 разделов, права администратора, Windows 10 Pro 22H2 (19045.6456) |
 | `--smoke` (release) | rc=0, 3,08 с (включая 2,5 с удержания окна) |
 | Секреты в release | найдены только имена Win32-функций (`OpenProcessToken`, `GetTokenInformation`) и `publicKeyToken` манифеста; ключей/паролей нет |
 
@@ -154,24 +154,24 @@ apply/revert/restore/verify имеет отдельный тест или про
 | context | 15/17 (D-31) | полный цикл, 18 тестов |
 | apps | 24/24 | полный цикл, 25 тестов; живой список пакетов |
 | autorun | 5 источников | живые 37 записей, снимок |
-| cleaner | 16/18 (D-39) | полный цикл, 18 тестов |
+| cleaner | 17/18 (CLN-START отложен) | полный цикл, 19 тестов |
 | optimization | 4/6 (D-39) | полный цикл, 5 тестов |
 | backup | 4/4 | полный цикл, 4 теста |
 | maintenance | 6/6 | полный цикл, 6 тестов |
 | sysinfo | отчёт | живой отчёт с ОС/CPU/RAM/GPU/дисками/сетью, снимок |
-| about | сведения | версия, лицензия, пути |
+| about | сведения и профиль | версия, лицензия, пути; экспорт/импорт профиля (только ID) |
 | virustotal | — | заглушка до ответа D-47 |
 
 ### Интерфейс
 
-Снимки, сделанные самим приложением (1200×780): `services.png`, `ui.png`, `system.png`, `context.png`, `autorun3.png`, `apps2.png`, `cleaner.png`, `optimization.png`, `sysinfo.png`, `backup.png`, `maintenance.png`. Проверены меню 14 разделов, списки, плитки приложений, прогресс/отмена, баннер восстановления, копирование и сохранение отчёта.
+Снимки, сделанные самим приложением (1200×780): `services.png`, `ui.png`, `system.png`, `context.png`, `autorun3.png`, `apps2.png`, `cleaner.png`, `optimization.png`, `sysinfo.png`, `backup.png`, `maintenance.png`, `about.png`. Проверены меню 14 разделов, списки, плитки приложений, прогресс/отмена, баннер восстановления, копирование и сохранение отчёта.
 
 ### Отложено (нужны отдельные условия)
 
 - одноразовая ВМ и снапшоты — недоступны в текущем окружении;
 - запуск под обычной учётной записью (UAC-перезапуск) — не выполнялся;
 - живые опасные операции: удаление приложений, очистка, сжатие, точка восстановления, импорт драйверов, очистка реестра — только предпросмотр/фейки;
-- профиль (D-48), проверка обновлений (D-46), VirusTotal (D-47), CLN-17/CLN-START, OPT-05/06 (D-39);
+- проверка обновлений (нужен URL, D-52), VirusTotal (D-47), CLN-START, OPT-05/06 (D-39); профиль и CLN-17 реализованы (D-50/D-51);
 - автоматизация кликов по UI не применялась: экраны проверены снимками и юнит-тестами.
 
 ### Вывод

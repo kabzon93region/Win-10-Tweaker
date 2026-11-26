@@ -436,12 +436,12 @@ mod tests {
     #[test]
     fn cleaner_catalog_loads_with_known_ids() {
         let tweaks = load_cleaner().expect("catalog must load");
-        assert_eq!(tweaks.len(), 16);
+        assert_eq!(tweaks.len(), 17);
         assert_eq!(
             tweaks.first().map(|tweak| tweak.id.as_str()),
             Some("CLN-01")
         );
-        assert_eq!(tweaks.last().map(|tweak| tweak.id.as_str()), Some("CLN-16"));
+        assert_eq!(tweaks.last().map(|tweak| tweak.id.as_str()), Some("CLN-17"));
         assert!(
             tweaks
                 .iter()
