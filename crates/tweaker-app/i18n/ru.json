@@ -403,5 +403,10 @@
   "tweak.CLN-17.title": "Права на служебные каталоги",
   "profile.empty_export": "Нет применённых пунктов для экспорта.",
   "profile.skipped": "Пропущено неизвестных: {count}.",
-  "profile.nothing_to_apply": "Все пункты профиля уже применены."
+  "profile.nothing_to_apply": "Все пункты профиля уже применены.",
+  "update.check": "Проверить обновления",
+  "update.available": "Доступна версия {latest}; у вас {current}.",
+  "update.current": "Установлена последняя версия {version}.",
+  "update.no_releases": "В репозитории пока нет релизов.",
+  "update.error": "Проверка не удалась: {reason}"
 }

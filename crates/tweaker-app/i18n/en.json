@@ -403,5 +403,10 @@
   "tweak.CLN-17.title": "Permissions on service folders",
   "profile.empty_export": "There are no applied items to export.",
   "profile.skipped": "Skipped unknown items: {count}.",
-  "profile.nothing_to_apply": "All profile items are already applied."
+  "profile.nothing_to_apply": "All profile items are already applied.",
+  "update.check": "Check for updates",
+  "update.available": "Version {latest} is available; you have {current}.",
+  "update.current": "The latest version {version} is installed.",
+  "update.no_releases": "The repository has no releases yet.",
+  "update.error": "The check failed: {reason}"
 }

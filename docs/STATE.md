@@ -9,10 +9,10 @@
 | Этап | 8 — приёмка: автопроверки и интерфейс пройдены; ВМ, UAC и живые опасные операции отложены (см. TEST_REPORT) |
 | Код | `Cargo.toml`, `crates/tweaker-core`, `crates/tweaker-windows`, `crates/tweaker-app` |
 | Версия | 0.1.0 |
-| Git | `a436149` (этап 7.2) |
+| Git | `80aa315` (этап 7.2); проверка обновлений — коммит после аудита |
 | Сборка | `cargo build --workspace` — успешно; `cargo build --release -p tweaker-app` — успешно |
-| Артефакт | `target/release/wintweaker.exe` — 7 470 080 байт, sha256 `DC1127131D83E1A2D61531E7D641019C5CF349DCB4F7CDDEB4ABB76DC1C065C8` |
-| Тесты | `cargo test --workspace` — 336 passed, 1 ignored (app 24, core 109, core-tests 25+4+19+18+6+5+21+26+22+18, windows 39) |
+| Артефакт | `target/release/wintweaker.exe` — 7 477 760 байт, sha256 `7F8FFEA8BEFE0456EF3A254BCEABCF212A3F9C3412D5EE9CADFB982E098728F8` |
+| Тесты | `cargo test --workspace` — 337 passed, 1 ignored (app 24, core 109, core-tests 25+4+19+18+6+5+21+26+22+18, windows 40) |
 | Проверки | clippy/fmt чисто; снимки `services.png`, `ui.png`, `system.png`, `context.png`, `autorun3.png`, `apps2.png`, `cleaner.png`, `optimization.png`, `sysinfo.png`, `backup.png`, `maintenance.png`, `about.png`; sysinfo — реальный отчёт с копированием и сохранением; `--selftest` rc=0; все 14 разделов открываются с кодом 0 (снимки `auto-*.png`, самый долгий `sysinfo` ≈5 с) |
 | Запуск | release `--selftest` 414 мс, `--smoke` 3,08 с (с удержанием окна 2,5 с); замер под UAC не выполнялся |
 | Блокирует | нет; D-2 и D-8 закрыты на этапе 6, открыты D-3…D-7 |
@@ -43,7 +43,7 @@
 | `crates/tweaker-core` | модель `TweakDefinition/Action/Plan`, каталог разделов (`data/sections.json`) и разделы `privacy` (17), `services` (24), `ui` (17), движок apply/detect/revert, журнал JSONL с двумя фазами, трейты адаптеров и фейки, действия hosts-блока, задач, удаления ключей и записи бинарных файлов, пути, логгер, `Lang`; приёмочные тесты каталога в `tests/` |
 | `crates/tweaker-windows` | адаптеры реестра, файлов, процессов, служб, планировщика задач и автозагрузки; права администратора и перезапуск, язык системы, сведения об ОС, защита от второй копии, системное сообщение |
 | `crates/tweaker-app` | окно egui, меню 14 разделов, универсальный экран каталога (любой раздел с данными), ru/en, режимы `--selftest`, `--smoke`, `--screenshot`, `--section <id>`, проба `tweak_probe` |
-| `crates/tweaker-app/i18n` | `ru.json`, `en.json` — по 405 строк, полнота проверяется тестом |
+| `crates/tweaker-app/i18n` | `ru.json`, `en.json` — по 410 строк, полнота проверяется тестом |
 | `crates/tweaker-app/build.rs` | манифест: release — `requireAdministrator`, debug — `asInvoker` |
 
 ## План этапов
@@ -57,7 +57,7 @@
 | 4 | Тесты: unit по разделу, смоук и негативные сценарии по `TESTPLAN.md` | отчёт о тестировании | завершён |
 | 5 | Остальные разделы настроек (context, ui, system, services, autorun, apps) | по критериям `TESTPLAN.md` | завершён: `services` 24/24, `ui` 17/17, `system` 18/18, `context` 15/17, `autorun` (5 источников), `apps` 24/24 |
 | 6 | Очистка и оптимизация (опасные операции, предпросмотр, отмена) | 🔴-пункты только с подтверждением | завершён с исключениями: `cleaner` 17/18, `optimization` 4/6, см. D-39 |
-| 7 | Сервисные разделы: sysinfo, backup, профиль, обновления, VirusTotal, about, maintenance | по решению владельца | `sysinfo`, `backup` 4/4, `maintenance` 6/6, профиль (ID); обновления ждут URL, VT — D-47 |
+| 7 | Сервисные разделы: sysinfo, backup, профиль, обновления, VirusTotal, about, maintenance | по решению владельца | `sysinfo`, `backup` 4/4, `maintenance` 6/6, профиль (ID), проверка обновлений (тег GitHub, D-53); VT — D-47 |
 | 8 | Приёмка: чек-лист `TESTPLAN.md`, воспроизводимая сборка, документация | приёмочный отчёт | завершён: автопроверки/интерфейс пройдены, ВМ и живые опасные операции отложены |
 
 ## Артефакты этапов 1–5
@@ -88,7 +88,7 @@
 | Приёмочные тесты разделов | `crates/tweaker-core/tests/{common,*_section}.rs` | 164 теста в 10 файлах: apps 25, backup 4, cleaner 19, context 18, maintenance 6, optimization 5, privacy 21, services 26, system 22, ui 18 |
 | Адаптеры Windows | `crates/tweaker-windows/src/{registry,files,process,services,scheduler,startup,single_instance,message}.rs` | чтение HKLM, служб, задач и автозагрузки; защита от второй копии; запись HKCU проверена standalone-запуском вне песочницы |
 | Юнит-тесты | `crates/*/src/**` (`#[cfg(test)]`) | 172 passed, 1 ignored (app 24, core 109, windows 39) |
-| Отчёт о тестировании | `docs/TEST_REPORT.md` | итоговая приёмка этапа 8: 336 тестов, selftest/smoke rc=0, воспроизводимая сборка; ВМ/UAC/живые опасные операции отложены |
+| Отчёт о тестировании | `docs/TEST_REPORT.md` | итоговая приёмка этапа 8: 337 тестов, selftest/smoke rc=0, воспроизводимая сборка; ВМ/UAC/живые опасные операции отложены |
 | Карта кода | `docs/CODE_MAP.md` | обновлена на этапе 7 |
 | Отчёт самопроверки | `%LocalAppData%\WinTweaker\logs\wintweaker.log` | `--selftest` rc=0; все 14 разделов открываются с кодом 0 (снимки `auto-*.png`, самый долгий `sysinfo` ≈5 с) |
 | Снимки окна | `%TEMP%\wintweaker-run\{services,ui,system,context,autorun3,apps2,cleaner,optimization,sysinfo,backup,maintenance,about}.png` (вне git) | 1200×780, сняты самим приложением |
@@ -112,5 +112,6 @@
 | 2026-11-26 | 5 (часть 6) | Раздел `apps`: 24 плитки, действие `AppxRemove` (снимок семейства и манифеста, откат регистрацией), адаптер `IAppx` через реестр пакетов пользователя и `Remove-AppxPackage`/`Add-AppxPackage`, экран с плитками, состояниями «установлено/удалено», подтверждением, «Удалить все»/«Восстановить все», подсказкой про Магазин; i18n 337 строк | `cargo test` 289 passed (app 24, core 100, core-tests 25+21+26+18+22+18, windows 35), 1 ignored; clippy/fmt чисто; снимок `apps2.png` — 24 плитки, 6 установленных; `--section apps` rc=0 |
 | 2026-11-26 | 6 | Движок: `apply_with` с отменой между действиями и `ApplyReport.cancelled/freed_bytes/skipped_files`; действие `CleanPaths` со снимком `None`, измерением объёма и пропуском занятых файлов; фоновое выполнение в UI с прогресс-баром и кнопкой отмены; баннер незавершённых операций при старте; разделы `cleaner` (17 пунктов) и `optimization` (4 пункта); i18n 373 строки | `cargo test` 319 passed (app 24, core 105, core-tests 25+18+5+21+26+22+18, windows 37), 1 ignored; clippy/fmt чисто; снимки `cleaner.png`, `optimization.png`; исключения CLN-17/START, OPT-05/06 — D-39 |
 | 2026-11-26 | 7 (часть 1) | `sysinfo`: отчёт через CIM с UTF-8, копирование и сохранение без отправки; каталоги `backup` (4) и `maintenance` (6) на существующих действиях; about со сведениями и путями; профиль, обновления и VirusTotal отложены до ответов D-46…D-48; i18n 402 строки | `cargo test` 331 passed (app 24, core 105, core-tests 25+4+18+18+6+5+21+26+22+18, windows 39), 1 ignored; clippy/fmt чисто; снимки `sysinfo.png`, `backup.png`, `maintenance.png` |
-| 2026-11-26 | 8 | Итоговая приёмка: 336 тестов, clippy/fmt, `--locked` сборка с тем же sha256, `--selftest` 414 мс, `--smoke` 3,08 с, скан release на секреты, снимки всех экранов; `TEST_REPORT.md` дополнен итоговым разделом; ВМ, UAC и живые опасные операции отложены | 336 passed, 1 ignored; release 7 470 080 байт, sha256 `DC1127131D83E1A2D61531E7D641019C5CF349DCB4F7CDDEB4ABB76DC1C065C8` |
-| 2026-11-26 | 7 (часть 2) | Профиль настроек: экспорт включённых пунктов (только ID) в `config\profile.json`, импорт с предпросмотром и фоновым применением; CLN-17 — права на служебные каталоги через `icacls` с подтверждением; i18n 405 строк | `cargo test` 336 passed (app 24, core 109, core-tests 25+4+19+18+6+5+21+26+22+18, windows 39), 1 ignored; clippy/fmt чисто; снимок `about.png` с кнопками профиля |
+| 2026-11-26 | 8 | Итоговая приёмка: 336 тестов, clippy/fmt, `--locked` сборка с тем же sha256, `--selftest` 414 мс, `--smoke` 3,08 с, скан release на секреты, снимки всех экранов; `TEST_REPORT.md` дополнен итоговым разделом; ВМ, UAC и живые опасные операции отложены | 336 passed, 1 ignored; release 7 477 760 байт, sha256 `7F8FFEA8BEFE0456EF3A254BCEABCF212A3F9C3412D5EE9CADFB982E098728F8` |
+| 2026-11-26 | 7 (часть 2) | Профиль настроек: экспорт включённых пунктов (только ID) в `config\profile.json`, импорт с предпросмотром и фоновым применением; CLN-17 — права на служебные каталоги через `icacls` с подтверждением; i18n 410 строк | `cargo test` 336 passed (app 24, core 109, core-tests 25+4+19+18+6+5+21+26+22+18, windows 39), 1 ignored; clippy/fmt чисто; снимок `about.png` с кнопками профиля |
+| 2026-11-26 | 7 (часть 3) | Создан публичный GitHub-репозиторий и релиз `v0.1.0`; проверка обновлений по последнему тегу GitHub Releases в about, без скачивания и установки (D-53); i18n 410 строк | `cargo test` 337 passed (app 24, core 109, core-tests 25+4+19+18+6+5+21+26+22+18, windows 40), 1 ignored; `gh api releases/latest` → v0.1.0; снимок `about.png` |

@@ -134,12 +134,12 @@ apply/revert/restore/verify имеет отдельный тест или про
 
 | Показатель | Значение |
 |---|---|
-| `cargo test --workspace` | 336 passed, 1 ignored (app 24, core 109, core-tests: apps 25, backup 4, cleaner 19, context 18, maintenance 6, optimization 5, privacy 21, services 26, system 22, ui 18, windows 39) |
+| `cargo test --workspace` | 337 passed, 1 ignored (app 24, core 109, core-tests: apps 25, backup 4, cleaner 19, context 18, maintenance 6, optimization 5, privacy 21, services 26, system 22, ui 18, windows 40) |
 | `cargo clippy --workspace --all-targets -- -D warnings` | rc=0 |
 | `cargo fmt --all -- --check` | rc=0 |
 | `cargo build --release -p tweaker-app --locked` | успешно, повторная сборка даёт тот же файл |
-| Release-бинарник | 7 470 080 байт, sha256 `DC1127131D83E1A2D61531E7D641019C5CF349DCB4F7CDDEB4ABB76DC1C065C8` |
-| `--selftest` (release) | rc=0; 405 ключей ru/en, 14 разделов, права администратора, Windows 10 Pro 22H2 (19045.6456) |
+| Release-бинарник | 7 477 760 байт, sha256 `7F8FFEA8BEFE0456EF3A254BCEABCF212A3F9C3412D5EE9CADFB982E098728F8` |
+| `--selftest` (release) | rc=0; 410 ключей ru/en, 14 разделов, права администратора, Windows 10 Pro 22H2 (19045.6456) |
 | `--smoke` (release) | rc=0, 3,08 с (включая 2,5 с удержания окна) |
 | Секреты в release | найдены только имена Win32-функций (`OpenProcessToken`, `GetTokenInformation`) и `publicKeyToken` манифеста; ключей/паролей нет |
 
@@ -159,7 +159,7 @@ apply/revert/restore/verify имеет отдельный тест или про
 | backup | 4/4 | полный цикл, 4 теста |
 | maintenance | 6/6 | полный цикл, 6 тестов |
 | sysinfo | отчёт | живой отчёт с ОС/CPU/RAM/GPU/дисками/сетью, снимок |
-| about | сведения и профиль | версия, лицензия, пути; экспорт/импорт профиля (только ID) |
+| about | сведения, профиль и обновления | версия, лицензия, пути; экспорт/импорт профиля (только ID); проверка тега GitHub без установки |
 | virustotal | — | заглушка до ответа D-47 |
 
 ### Интерфейс
@@ -171,7 +171,7 @@ apply/revert/restore/verify имеет отдельный тест или про
 - одноразовая ВМ и снапшоты — недоступны в текущем окружении;
 - запуск под обычной учётной записью (UAC-перезапуск) — не выполнялся;
 - живые опасные операции: удаление приложений, очистка, сжатие, точка восстановления, импорт драйверов, очистка реестра — только предпросмотр/фейки;
-- проверка обновлений (нужен URL, D-52), VirusTotal (D-47), CLN-START, OPT-05/06 (D-39); профиль и CLN-17 реализованы (D-50/D-51);
+- VirusTotal (D-47), CLN-START, OPT-05/06 (D-39); профиль, CLN-17 и проверка обновлений реализованы (D-50/D-51/D-53);
 - автоматизация кликов по UI не применялась: экраны проверены снимками и юнит-тестами.
 
 ### Вывод

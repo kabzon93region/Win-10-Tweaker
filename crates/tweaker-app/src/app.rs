@@ -303,6 +303,7 @@ struct TweakerApp {
     profile_report: Option<String>,
     profile_preview: Vec<String>,
     profile_pending: Vec<String>,
+    update_report: Option<String>,
     recovery_report: Option<Vec<String>>,
     pending_recovery: Option<usize>,
 }
@@ -544,6 +545,7 @@ impl TweakerApp {
             profile_report: None,
             profile_preview: Vec::new(),
             profile_pending: Vec::new(),
+            update_report: None,
         }
     }
 
@@ -855,6 +857,14 @@ impl TweakerApp {
                                         });
                                     }
                                     if let Some(report) = &self.profile_report {
+                                        ui.add_space(6.0);
+                                        ui.label(report);
+                                    }
+                                    ui.add_space(8.0);
+                                    if ui.button(self.loc.t("update.check")).clicked() {
+                                        self.check_updates();
+                                    }
+                                    if let Some(report) = &self.update_report {
                                         ui.add_space(6.0);
                                         ui.label(report);
                                     }
@@ -1333,6 +1343,31 @@ impl TweakerApp {
         }
         self.start_apply_jobs(JobTarget::Profile, jobs);
         self.profile_report = Some(self.loc.t("profile.applying"));
+    }
+    /// Checks the latest GitHub release tag; nothing is downloaded.
+    fn check_updates(&mut self) {
+        match tweaker_windows::update::latest_tag("kabzon93region/Win-10-Tweaker") {
+            Ok(Some(latest)) => {
+                if latest == PRODUCT_VERSION {
+                    self.update_report = Some(
+                        self.loc
+                            .fmt("update.current", &[("version", PRODUCT_VERSION)]),
+                    );
+                } else {
+                    self.update_report = Some(self.loc.fmt(
+                        "update.available",
+                        &[("latest", &latest), ("current", PRODUCT_VERSION)],
+                    ));
+                }
+            }
+            Ok(None) => {
+                self.update_report = Some(self.loc.t("update.no_releases"));
+            }
+            Err(error) => {
+                self.update_report =
+                    Some(self.loc.fmt("update.error", &[("reason", &error.message)]));
+            }
+        }
     }
     /// Reloads the system information report.
     fn refresh_sysinfo(&mut self) {

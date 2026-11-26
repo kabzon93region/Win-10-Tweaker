@@ -45,6 +45,7 @@
 | `src/message.rs` | `info(title, text)` | Модальное информационное окно до создания GUI и логгера |
 | `src/elevation.rs` | `is_elevated`, `ensure_elevated` | Токен администратора, перезапуск через `runas` |
 | `src/locale.rs` | `system_ui_language` | `GetUserDefaultUILanguage` → `Lang` |
+| `src/update.rs` | `latest_tag`, `normalize_tag` | Последний тег GitHub Releases через HTTPS, без скачивания |
 | `src/os.rs` | `os_info`, `WindowsSystemInfo` (`ISystemInfo`) | Версия ОС и полный отчёт через CIM: ОС, CPU, RAM, GPU, мониторы, диски, сеть; UTF-8 |
 
 ## tweaker-app
@@ -52,7 +53,7 @@
 | Файл | Элементы | Роль |
 |---|---|---|
 | `src/main.rs` | `Mode`, `parse_args` | `--selftest`, `--smoke`, `--screenshot <png>`, `--section <id>`, `--version`, `--help` |
-| `src/app.rs` | публичные `RunMode`, `install_style`; приватные `TweakerApp` (реализует `eframe::App`), `CatalogView`, `CatalogAction`, `StartupView`, `StartupAction`, `AppsView`, `AppsAction`, `AppsPending`, `ApplyJob`, `JobProgress`, `TweakOutcome`, `SysinfoView`, `ProfileAction`, `load_catalog`, `select_section`, `save_screenshot` | Окно, меню 14 разделов, универсальный экран каталога, экран автозагрузки, экран приложений, экран системной информации (копирование/сохранение), экспорт/импорт профиля в about, фоновое применение с прогрессом и отменой, баннер незавершённых операций, защита от второй копии окна, статус-бар, режим снимка + watchdog |
+| `src/app.rs` | публичные `RunMode`, `install_style`; приватные `TweakerApp` (реализует `eframe::App`), `CatalogView`, `CatalogAction`, `StartupView`, `StartupAction`, `AppsView`, `AppsAction`, `AppsPending`, `ApplyJob`, `JobProgress`, `TweakOutcome`, `SysinfoView`, `ProfileAction`, `load_catalog`, `select_section`, `save_screenshot` | Окно, меню 14 разделов, универсальный экран каталога, экран автозагрузки, экран приложений, экран системной информации (копирование/сохранение), экспорт/импорт профиля и проверка обновлений в about, фоновое применение с прогрессом и отменой, баннер незавершённых операций, защита от второй копии окна, статус-бар, режим снимка + watchdog |
 | `examples/tweak_probe.rs` | `main`, `run` | Живая проба одного пункта каталога вне окна; в релиз не входит |
 | `src/i18n.rs` | `Localizer`, `detect_lang` | ru/en из embedded JSON, форматирование `{placeholders}` |
 | `src/selftest.rs` | `run` | Проверки без окна: пути, лог, локализация, разделы, права, ОС |
@@ -106,7 +107,7 @@ TweakDefinition (данные каталога, этап 3)
 ## Известные пробелы (на этапе 7)
 
 - Подмножество требований очистки/оптимизации зафиксировано в D-39/D-45: OPT-01/03 без выбора алгоритма, CLN-11 — 5 корней, CLN-04 без Firefox/Cent.
-- Профиль выведен в about (D-50); проверка обновлений ждёт URL (D-52), VirusTotal показывает заглушку (D-47).
+- Профиль и проверка обновлений (тег GitHub, D-53) выведены в about; VirusTotal показывает заглушку (D-47).
 - Каталог: `privacy` 17/17, `services` 24/24, `ui` 17/17, `system` 18/18, `context` 15/17 (CTX-07/08 исключены), `apps` 24/24, `cleaner` 17/18, `optimization` 4/6 (D-39), `backup` 4/4, `maintenance` 6/6; `autorun` — динамический экран на 5 источников.
 - UI-02/12/13 — документированная часть требований (подмена шрифтов, 8 значений, классическое меню), см. D-25.
 - Отмена длительной операции не прерывает уже запущенную команду (`compact`/`dism`), только следующие действия (D-38).
