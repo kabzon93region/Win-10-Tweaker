@@ -1,21 +1,21 @@
 # Состояние работ
 
-Обновлено: 2026-11-26 (этап 7: системная информация, сервис, обслуживание; профиль/обновления/VirusTotal отложены).
+Обновлено: 2026-11-26 (этап 8: итоговая приёмка; автоматические проверки и интерфейс пройдены, ВМ и живые опасные операции отложены).
 
 ## Текущий статус
 
 | Параметр | Значение |
 |---|---|
-| Этап | 7 — сервисные разделы — частично: sysinfo, backup 4/4, maintenance 6/6, about; профиль/обновления/VirusTotal — D-46…D-48 |
+| Этап | 8 — приёмка: автопроверки и интерфейс пройдены; ВМ, UAC и живые опасные операции отложены (см. TEST_REPORT) |
 | Код | `Cargo.toml`, `crates/tweaker-core`, `crates/tweaker-windows`, `crates/tweaker-app` |
 | Версия | 0.1.0 |
-| Git | `79556f8` (этап 7) |
+| Git | `457ebe5` (этап 7); этап 8 — коммит после аудита |
 | Сборка | `cargo build --workspace` — успешно; `cargo build --release -p tweaker-app` — успешно |
 | Артефакт | `target/release/wintweaker.exe` — 7 438 336 байт, sha256 `BBD3E4C4062E83E65CCD4DFFC57D154B7C21D785BEF2AAB6A46327D11B59524A` |
 | Тесты | `cargo test --workspace` — 331 passed, 1 ignored (app 24, core 105, core-tests 25+4+18+18+6+5+21+26+22+18, windows 39) |
 | Проверки | clippy/fmt чисто; снимки `services.png`, `ui.png`, `system.png`, `context.png`, `autorun3.png`, `apps2.png`, `cleaner.png`, `optimization.png`, `sysinfo.png`, `backup.png`, `maintenance.png`; sysinfo — реальный отчёт с копированием и сохранением; `--selftest` rc=0 |
-| Запуск | debug: ≈1,8 с до первых кадров; release-замер — этап 8 |
-| Блокирует | нет; открытые дефекты D-2…D-8 прежние |
+| Запуск | release `--selftest` 414 мс, `--smoke` 3,08 с (с удержанием окна 2,5 с); замер под UAC не выполнялся |
+| Блокирует | нет; D-2 и D-8 закрыты на этапе 6, открыты D-3…D-7 |
 
 ## Окружение сборки
 
@@ -58,7 +58,7 @@
 | 5 | Остальные разделы настроек (context, ui, system, services, autorun, apps) | по критериям `TESTPLAN.md` | завершён: `services` 24/24, `ui` 17/17, `system` 18/18, `context` 15/17, `autorun` (5 источников), `apps` 24/24 |
 | 6 | Очистка и оптимизация (опасные операции, предпросмотр, отмена) | 🔴-пункты только с подтверждением | завершён с исключениями: `cleaner` 16/18, `optimization` 4/6, см. D-39 |
 | 7 | Сервисные разделы: sysinfo, backup, профиль, обновления, VirusTotal, about, maintenance | по решению владельца | частично: `sysinfo` (отчёт), `backup` 4/4, `maintenance` 6/6, `about` (сведения); профиль/обновления/VT — D-46…D-48 |
-| 8 | Приёмка: чек-лист `TESTPLAN.md`, воспроизводимая сборка, документация | приёмочный отчёт | не начат |
+| 8 | Приёмка: чек-лист `TESTPLAN.md`, воспроизводимая сборка, документация | приёмочный отчёт | завершён: автопроверки/интерфейс пройдены, ВМ и живые опасные операции отложены |
 
 ## Артефакты этапов 1–5
 
@@ -85,13 +85,13 @@
 | Исходники каркаса | `crates/` | `cargo build --workspace` rc=0 |
 | Зафиксированные зависимости | `Cargo.lock` | `cargo build --locked` |
 | Движок и журнал | `crates/tweaker-core/src/{action,adapters,catalog,model,journal,engine,fake}.rs` | apply/detect/revert/журнал/сбой/восстановление/hosts/задачи |
-| Приёмочные тесты разделов | `crates/tweaker-core/tests/{common,privacy_section,services_section,ui_section,system_section,context_section}.rs` | 21 + 26 + 18 + 22 + 18 тестов: полный цикл по каждому пункту, ошибки адаптеров, отсутствие служб |
+| Приёмочные тесты разделов | `crates/tweaker-core/tests/{common,*_section}.rs` | 163 теста в 10 файлах: apps 25, backup 4, cleaner 18, context 18, maintenance 6, optimization 5, privacy 21, services 26, system 22, ui 18 |
 | Адаптеры Windows | `crates/tweaker-windows/src/{registry,files,process,services,scheduler,startup,single_instance,message}.rs` | чтение HKLM, служб, задач и автозагрузки; защита от второй копии; запись HKCU проверена standalone-запуском вне песочницы |
-| Юнит-тесты | `crates/*/src/**` (`#[cfg(test)]`) | 289 passed, 1 ignored |
-| Отчёт о тестировании | `docs/TEST_REPORT.md` | 31/46 проверок TESTPLAN пройдено, 15 отложено, 0 провалов (этап 4) |
+| Юнит-тесты | `crates/*/src/**` (`#[cfg(test)]`) | 168 passed, 1 ignored (app 24, core 105, windows 39) |
+| Отчёт о тестировании | `docs/TEST_REPORT.md` | итоговая приёмка этапа 8: 331 тест, selftest/smoke rc=0, воспроизводимая сборка; ВМ/UAC/живые опасные операции отложены |
 | Карта кода | `docs/CODE_MAP.md` | обновлена на этапе 7 |
 | Отчёт самопроверки | `%LocalAppData%\WinTweaker\logs\wintweaker.log` | `--selftest` rc=0 |
-| Снимки окна | `%TEMP%\wintweaker-run\{services,ui,system,context,autorun3,apps2}.png` (вне git) | 1200×780, сняты самим приложением |
+| Снимки окна | `%TEMP%\wintweaker-run\{services,ui,system,context,autorun3,apps2,cleaner,optimization,sysinfo,backup,maintenance}.png` (вне git) | 1200×780, сняты самим приложением |
 | Release-бинарник | `target/release/wintweaker.exe` (не в git) | см. «Артефакт» выше |
 
 ## Журнал этапов
@@ -112,3 +112,4 @@
 | 2026-11-26 | 5 (часть 6) | Раздел `apps`: 24 плитки, действие `AppxRemove` (снимок семейства и манифеста, откат регистрацией), адаптер `IAppx` через реестр пакетов пользователя и `Remove-AppxPackage`/`Add-AppxPackage`, экран с плитками, состояниями «установлено/удалено», подтверждением, «Удалить все»/«Восстановить все», подсказкой про Магазин; i18n 337 строк | `cargo test` 289 passed (app 24, core 100, core-tests 25+21+26+18+22+18, windows 35), 1 ignored; clippy/fmt чисто; снимок `apps2.png` — 24 плитки, 6 установленных; `--section apps` rc=0 |
 | 2026-11-26 | 6 | Движок: `apply_with` с отменой между действиями и `ApplyReport.cancelled/freed_bytes/skipped_files`; действие `CleanPaths` со снимком `None`, измерением объёма и пропуском занятых файлов; фоновое выполнение в UI с прогресс-баром и кнопкой отмены; баннер незавершённых операций при старте; разделы `cleaner` (16 пунктов) и `optimization` (4 пункта); i18n 373 строки | `cargo test` 319 passed (app 24, core 105, core-tests 25+18+5+21+26+22+18, windows 37), 1 ignored; clippy/fmt чисто; снимки `cleaner.png`, `optimization.png`; исключения CLN-17/START, OPT-05/06 — D-39 |
 | 2026-11-26 | 7 (часть 1) | `sysinfo`: отчёт через CIM с UTF-8, копирование и сохранение без отправки; каталоги `backup` (4) и `maintenance` (6) на существующих действиях; about со сведениями и путями; профиль, обновления и VirusTotal отложены до ответов D-46…D-48; i18n 392 строки | `cargo test` 331 passed (app 24, core 105, core-tests 25+4+18+18+6+5+21+26+22+18, windows 39), 1 ignored; clippy/fmt чисто; снимки `sysinfo.png`, `backup.png`, `maintenance.png` |
+| 2026-11-26 | 8 | Итоговая приёмка: 331 тест, clippy/fmt, `--locked` сборка с тем же sha256, `--selftest` 414 мс, `--smoke` 3,08 с, скан release на секреты, снимки всех экранов; `TEST_REPORT.md` дополнен итоговым разделом; ВМ, UAC и живые опасные операции отложены | 331 passed, 1 ignored; release 7 438 336 байт, sha256 `BBD3E4C4062E83E65CCD4DFFC57D154B7C21D785BEF2AAB6A46327D11B59524A` |
