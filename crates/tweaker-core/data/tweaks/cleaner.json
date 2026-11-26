@@ -1,0 +1,302 @@
+[
+  {
+    "id": "CLN-01",
+    "section": "cleaner",
+    "titleKey": "tweak.CLN-01.title",
+    "descriptionKey": "tweak.CLN.description",
+    "risk": "high",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "process_run",
+        "program": "powershell.exe",
+        "args": [
+          "-NoProfile",
+          "-NonInteractive",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-Command",
+          "$s='[DllImport(\"psapi.dll\")]public static extern bool EmptyWorkingSet(IntPtr h);';$t=Add-Type -MemberDefinition $s -Name W -Namespace T -PassThru;Get-Process|Where-Object{$_.MainWindowHandle -eq 0 -and $_.Id -ne $PID}|ForEach-Object{[void]$t::EmptyWorkingSet($_.Handle)}"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "CLN-02",
+    "section": "cleaner",
+    "titleKey": "tweak.CLN-02.title",
+    "descriptionKey": "tweak.CLN.description",
+    "risk": "low",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "clean_paths",
+        "paths": [
+          "%LOCALAPPDATA%\\AMD\\DxCache",
+          "%LOCALAPPDATA%\\AMD\\DxcCache",
+          "%LOCALAPPDATA%\\NVIDIA\\DXCache",
+          "%LOCALAPPDATA%\\NVIDIA\\GLCache",
+          "%PROGRAMDATA%\\NVIDIA Corporation\\NV_Cache",
+          "%PROGRAMFILES(X86)%\\Steam\\appcache",
+          "%LOCALAPPDATA%\\Steam\\htmlcache",
+          "%LOCALAPPDATA%\\Steam\\Steam\\codecache"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "CLN-03",
+    "section": "cleaner",
+    "titleKey": "tweak.CLN-03.title",
+    "descriptionKey": "tweak.CLN.description",
+    "risk": "low",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "clean_paths",
+        "paths": [
+          "C:\\MSOCache",
+          "%PROGRAMDATA%\\NVIDIA Corporation\\Installer2"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "CLN-04",
+    "section": "cleaner",
+    "titleKey": "tweak.CLN-04.title",
+    "descriptionKey": "tweak.CLN.description",
+    "risk": "low",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "clean_paths",
+        "paths": [
+          "%LOCALAPPDATA%\\Google\\Chrome\\User Data\\Default\\Cache",
+          "%LOCALAPPDATA%\\Google\\Chrome\\User Data\\Default\\Code Cache",
+          "%LOCALAPPDATA%\\Microsoft\\Edge\\User Data\\Default\\Cache",
+          "%LOCALAPPDATA%\\Yandex\\YandexBrowser\\User Data\\Default\\Cache",
+          "%APPDATA%\\Opera Software\\Opera Stable\\Cache"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "CLN-05",
+    "section": "cleaner",
+    "titleKey": "tweak.CLN-05.title",
+    "descriptionKey": "tweak.CLN.description",
+    "risk": "low",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "clean_paths",
+        "paths": [
+          "%LOCALAPPDATA%\\Microsoft\\Windows\\Explorer"
+        ]
+      },
+      {
+        "kind": "registry_set",
+        "key": { "root": "hkcu", "path": "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StateStore" },
+        "name": "ResetCache",
+        "value": { "kind": "dword", "data": 1 }
+      }
+    ]
+  },
+  {
+    "id": "CLN-06",
+    "section": "cleaner",
+    "titleKey": "tweak.CLN-06.title",
+    "descriptionKey": "tweak.CLN.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "clean_paths",
+        "paths": [
+          "%PROGRAMDATA%\\Microsoft\\Windows Defender\\Scans\\History",
+          "%PROGRAMDATA%\\Microsoft\\Windows Defender\\Definition Updates"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "CLN-07",
+    "section": "cleaner",
+    "titleKey": "tweak.CLN-07.title",
+    "descriptionKey": "tweak.CLN.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "clean_paths",
+        "paths": [
+          "C:\\Windows\\Installer\\$PatchCache$"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "CLN-08",
+    "section": "cleaner",
+    "titleKey": "tweak.CLN-08.title",
+    "descriptionKey": "tweak.CLN.description",
+    "risk": "critical",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "clean_paths",
+        "paths": [
+          "C:\\$Windows.~BT",
+          "C:\\$Windows.~WS"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "CLN-09",
+    "section": "cleaner",
+    "titleKey": "tweak.CLN-09.title",
+    "descriptionKey": "tweak.CLN.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "clean_paths",
+        "paths": [
+          "C:\\Windows\\Logs",
+          "C:\\Windows\\SoftwareDistribution\\DataStore\\Logs",
+          "%LOCALAPPDATA%\\Microsoft\\CLR_v4.0\\UsageLogs"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "CLN-10",
+    "section": "cleaner",
+    "titleKey": "tweak.CLN-10.title",
+    "descriptionKey": "tweak.CLN.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      { "kind": "registry_delete_key", "key": { "root": "hkcu", "path": "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\RunMRU" } },
+      { "kind": "registry_delete_key", "key": { "root": "hkcu", "path": "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\RecentDocs" } },
+      { "kind": "registry_delete_key", "key": { "root": "hkcu", "path": "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\UserAssist" } },
+      { "kind": "registry_delete_key", "key": { "root": "hkcu", "path": "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\TypedPaths" } },
+      { "kind": "registry_delete_key", "key": { "root": "hkcu", "path": "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ComDlg32\\LastVisitedPidlMRU" } },
+      { "kind": "registry_delete_key", "key": { "root": "hkcu", "path": "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ComDlg32\\OpenSavePidlMRU" } },
+      { "kind": "registry_delete_key", "key": { "root": "hkcu", "path": "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FeatureUsage" } },
+      { "kind": "registry_delete_key", "key": { "root": "hkcu", "path": "Software\\Microsoft\\Windows\\CurrentVersion\\Search\\RecentApps" } },
+      { "kind": "registry_delete_key", "key": { "root": "hkcu", "path": "Software\\Microsoft\\Windows\\CurrentVersion\\Search\\JumplistData" } },
+      { "kind": "registry_delete_key", "key": { "root": "hkcu", "path": "Software\\Classes\\Local Settings\\Software\\Microsoft\\Windows\\Shell\\MuiCache" } }
+    ]
+  },
+  {
+    "id": "CLN-11",
+    "section": "cleaner",
+    "titleKey": "tweak.CLN-11.title",
+    "descriptionKey": "tweak.CLN.description",
+    "risk": "critical",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "process_run",
+        "program": "powershell.exe",
+        "args": [
+          "-NoProfile",
+          "-NonInteractive",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-Command",
+          "$roots=@('C:\\Windows\\Temp','C:\\Windows\\Prefetch','C:\\Windows\\SoftwareDistribution\\Download','C:\\ProgramData\\Microsoft\\Windows\\WER','C:\\Windows\\Logs');foreach($r in $roots){if(Test-Path -LiteralPath $r){Get-ChildItem -LiteralPath $r -Directory -Force -ErrorAction SilentlyContinue|Where-Object{(Get-ChildItem -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue|Measure-Object).Count -eq 0}|Remove-Item -Force -ErrorAction SilentlyContinue}}"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "CLN-12",
+    "section": "cleaner",
+    "titleKey": "tweak.CLN-12.title",
+    "descriptionKey": "tweak.CLN.description",
+    "risk": "medium",
+    "requiresReboot": true,
+    "actions": [
+      {
+        "kind": "process_run_reversible",
+        "program": "powercfg.exe",
+        "args": ["-h", "off"],
+        "revert_program": "powercfg.exe",
+        "revert_args": ["-h", "on"]
+      }
+    ]
+  },
+  {
+    "id": "CLN-13",
+    "section": "cleaner",
+    "titleKey": "tweak.CLN-13.title",
+    "descriptionKey": "tweak.CLN.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "clean_paths",
+        "paths": [
+          "%TEMP%",
+          "C:\\Windows\\Temp",
+          "%LOCALAPPDATA%\\Microsoft\\Windows\\INetCache",
+          "%LOCALAPPDATA%\\Microsoft\\Windows\\WER"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "CLN-14",
+    "section": "cleaner",
+    "titleKey": "tweak.CLN-14.title",
+    "descriptionKey": "tweak.CLN.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "clean_paths",
+        "paths": [
+          "C:\\Windows\\System32\\LogFiles",
+          "%PROGRAMDATA%\\Microsoft\\Windows\\WER"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "CLN-15",
+    "section": "cleaner",
+    "titleKey": "tweak.CLN-15.title",
+    "descriptionKey": "tweak.CLN.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "clean_paths",
+        "paths": [
+          "C:\\Windows\\Panther",
+          "C:\\Windows\\Performance",
+          "C:\\Windows\\debug"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "CLN-16",
+    "section": "cleaner",
+    "titleKey": "tweak.CLN-16.title",
+    "descriptionKey": "tweak.CLN.description",
+    "risk": "critical",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "process_run",
+        "program": "cmd.exe",
+        "args": ["/c", "start", "", "ms-settings:regionlanguage"]
+      }
+    ]
+  }
+]

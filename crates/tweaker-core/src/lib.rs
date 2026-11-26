@@ -23,11 +23,14 @@ mod test_support;
 
 pub use action::{Action, RegistryKey, RegistryRoot, RegistryValue, ServiceStartMode};
 pub use adapters::{
-    AdapterError, AppxPackage, FirewallDirection, FirewallRule, IAppx, IFileSystem, IFirewall,
-    IProcessRunner, IRegistry, IScheduler, IServiceControl, IStartup, ISystemInfo, OsVersion,
-    ProcessOutput, ServiceState, ServiceStatus, StartupEntry, StartupSource,
+    AdapterError, AppxPackage, CleanStats, FirewallDirection, FirewallRule, IAppx, IFileSystem,
+    IFirewall, IProcessRunner, IRegistry, IScheduler, IServiceControl, IStartup, ISystemInfo,
+    OsVersion, ProcessOutput, ServiceState, ServiceStatus, StartupEntry, StartupSource,
 };
-pub use catalog::{CatalogError, load_apps, load_privacy, load_section, load_services};
+pub use catalog::{
+    CatalogError, load_apps, load_cleaner, load_optimization, load_privacy, load_section,
+    load_services,
+};
 pub use engine::{ApplyReport, Engine, FailedAction, PlanError, RevertReport};
 pub use journal::{AppliedOp, Journal, JournalRecord, Phase, Snapshot};
 pub use lang::Lang;

@@ -15,6 +15,8 @@ const UI_JSON: &str = include_str!("../data/tweaks/ui.json");
 const SYSTEM_JSON: &str = include_str!("../data/tweaks/system.json");
 const CONTEXT_JSON: &str = include_str!("../data/tweaks/context.json");
 const APPS_JSON: &str = include_str!("../data/tweaks/apps.json");
+const CLEANER_JSON: &str = include_str!("../data/tweaks/cleaner.json");
+const OPTIMIZATION_JSON: &str = include_str!("../data/tweaks/optimization.json");
 
 /// Problems found while loading the embedded catalog.
 #[derive(Debug)]
@@ -86,6 +88,16 @@ pub fn load_apps() -> Result<Vec<TweakDefinition>, CatalogError> {
     load(APPS_JSON, "apps")
 }
 
+/// Loads the cleanup list.
+pub fn load_cleaner() -> Result<Vec<TweakDefinition>, CatalogError> {
+    load(CLEANER_JSON, "cleaner")
+}
+
+/// Loads the optimization list.
+pub fn load_optimization() -> Result<Vec<TweakDefinition>, CatalogError> {
+    load(OPTIMIZATION_JSON, "optimization")
+}
+
 /// Loads a catalog section by its id.
 ///
 /// `Ok(None)` means the section is not a catalog (a tool screen) or its data has
@@ -98,6 +110,8 @@ pub fn load_section(section: &str) -> Result<Option<Vec<TweakDefinition>>, Catal
         "system" => load_system().map(Some),
         "context" => load_context().map(Some),
         "apps" => load_apps().map(Some),
+        "cleaner" => load_cleaner().map(Some),
+        "optimization" => load_optimization().map(Some),
         _ => Ok(None),
     }
 }
@@ -403,6 +417,40 @@ mod tests {
                 .collect::<Vec<_>>(),
             ["APP-01", "APP-08"]
         );
+    }
+
+    #[test]
+    fn cleaner_catalog_loads_with_known_ids() {
+        let tweaks = load_cleaner().expect("catalog must load");
+        assert_eq!(tweaks.len(), 16);
+        assert_eq!(
+            tweaks.first().map(|tweak| tweak.id.as_str()),
+            Some("CLN-01")
+        );
+        assert_eq!(tweaks.last().map(|tweak| tweak.id.as_str()), Some("CLN-16"));
+        assert!(
+            tweaks
+                .iter()
+                .all(|tweak| tweak.section == "cleaner" && !tweak.actions.is_empty())
+        );
+        let critical: Vec<&str> = tweaks
+            .iter()
+            .filter(|tweak| tweak.risk == RiskLevel::Critical)
+            .map(|tweak| tweak.id.as_str())
+            .collect();
+        assert_eq!(critical, ["CLN-08", "CLN-11", "CLN-16"]);
+    }
+
+    #[test]
+    fn optimization_catalog_loads_with_known_ids() {
+        let tweaks = load_optimization().expect("catalog must load");
+        assert_eq!(tweaks.len(), 4);
+        assert_eq!(
+            tweaks.first().map(|tweak| tweak.id.as_str()),
+            Some("OPT-01")
+        );
+        assert_eq!(tweaks.last().map(|tweak| tweak.id.as_str()), Some("OPT-04"));
+        assert!(tweaks.iter().all(|tweak| tweak.section == "optimization"));
     }
 
     #[test]

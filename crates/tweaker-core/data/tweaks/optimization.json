@@ -1,0 +1,82 @@
+[
+  {
+    "id": "OPT-01",
+    "section": "optimization",
+    "titleKey": "tweak.OPT-01.title",
+    "descriptionKey": "tweak.OPT.description",
+    "risk": "high",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "process_run_reversible",
+        "program": "powershell.exe",
+        "args": [
+          "-NoProfile",
+          "-NonInteractive",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-Command",
+          "$dirs=@('C:\\Windows','C:\\Program Files','C:\\ProgramData');foreach($d in $dirs){compact /c /s:$d /a /i /exe:xpress4k /q | Out-Null}"
+        ],
+        "revert_program": "powershell.exe",
+        "revert_args": [
+          "-NoProfile",
+          "-NonInteractive",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-Command",
+          "$dirs=@('C:\\Windows','C:\\Program Files','C:\\ProgramData');foreach($d in $dirs){compact /u /s:$d /a /i /q | Out-Null}"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "OPT-02",
+    "section": "optimization",
+    "titleKey": "tweak.OPT-02.title",
+    "descriptionKey": "tweak.OPT.description",
+    "risk": "high",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "process_run_reversible",
+        "program": "compact.exe",
+        "args": ["/compactos:always"],
+        "revert_program": "compact.exe",
+        "revert_args": ["/compactos:never"]
+      }
+    ]
+  },
+  {
+    "id": "OPT-03",
+    "section": "optimization",
+    "titleKey": "tweak.OPT-03.title",
+    "descriptionKey": "tweak.OPT.description",
+    "risk": "critical",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "process_run_reversible",
+        "program": "compact.exe",
+        "args": ["/c", "/s:C:\\Windows\\WinSxS", "/a", "/i", "/exe:xpress4k", "/q"],
+        "revert_program": "compact.exe",
+        "revert_args": ["/u", "/s:C:\\Windows\\WinSxS", "/a", "/i", "/q"]
+      }
+    ]
+  },
+  {
+    "id": "OPT-04",
+    "section": "optimization",
+    "titleKey": "tweak.OPT-04.title",
+    "descriptionKey": "tweak.OPT.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "process_run",
+        "program": "dism.exe",
+        "args": ["/Online", "/Cleanup-Image", "/StartComponentCleanup"]
+      }
+    ]
+  }
+]

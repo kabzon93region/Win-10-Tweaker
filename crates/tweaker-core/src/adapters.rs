@@ -113,6 +113,15 @@ pub struct FirewallRule {
     pub block: bool,
 }
 
+/// Result of a cleanup: how much was removed and what had to be skipped.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct CleanStats {
+    /// Bytes of deleted files.
+    pub freed_bytes: u64,
+    /// Files that were in use and were left alone.
+    pub skipped_files: usize,
+}
+
 /// One registry key with everything below it.
 ///
 /// Used when an action removes a whole key: the snapshot must keep the values and
@@ -158,6 +167,10 @@ pub trait IFileSystem {
     fn write_bytes(&self, path: &Path, bytes: &[u8]) -> Result<(), AdapterError>;
     /// Deletes a file; a missing file is not an error.
     fn delete(&self, path: &Path) -> Result<(), AdapterError>;
+    /// Total size of the files under these paths, for the cleanup preview.
+    fn measure(&self, paths: &[PathBuf]) -> Result<u64, AdapterError>;
+    /// Deletes files under these paths and keeps the roots; locked files are skipped.
+    fn clean(&self, paths: &[PathBuf]) -> Result<CleanStats, AdapterError>;
 }
 
 /// Where a startup entry comes from.

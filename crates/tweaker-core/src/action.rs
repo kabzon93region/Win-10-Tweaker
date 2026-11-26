@@ -303,6 +303,14 @@ pub enum Action {
         /// Family name or a distinctive part of it, e.g. `Microsoft.WindowsStore`.
         family: String,
     },
+    /// Delete the contents of cache folders. Not reversible.
+    ///
+    /// The roots themselves are kept; files that are in use are skipped and
+    /// counted in the report instead of failing the whole cleanup.
+    CleanPaths {
+        /// Folders or single files to clean.
+        paths: Vec<PathBuf>,
+    },
 }
 
 /// First line of the managed hosts block.
@@ -457,12 +465,20 @@ impl Action {
                 }
             }
             Action::AppxRemove { family } => format!("remove Store package {family}"),
+            Action::CleanPaths { paths } => {
+                let list = paths
+                    .iter()
+                    .map(|path| path.display().to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                format!("clean {list}")
+            }
         }
     }
 
     /// `false` for actions with no safe way back (external programs).
     pub fn is_reversible(&self) -> bool {
-        !matches!(self, Action::ProcessRun { .. })
+        !matches!(self, Action::ProcessRun { .. } | Action::CleanPaths { .. })
     }
 }
 

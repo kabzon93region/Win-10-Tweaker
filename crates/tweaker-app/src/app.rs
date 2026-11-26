@@ -10,12 +10,12 @@ use std::time::{Duration, Instant};
 
 use eframe::egui;
 use tweaker_core::action::{Action, RegistryKey, RegistryRoot, RegistryValue};
-use tweaker_core::adapters::{IStartup, StartupEntry, StartupSource};
+use tweaker_core::adapters::{IFileSystem, IStartup, StartupEntry, StartupSource};
 use tweaker_core::catalog;
 use tweaker_core::engine::{ApplyReport, Engine, RevertReport};
 use tweaker_core::journal::Journal;
 use tweaker_core::logging;
-use tweaker_core::model::{RiskLevel, TweakDefinition, TweakState};
+use tweaker_core::model::{Plan, RiskLevel, TweakDefinition, TweakState};
 use tweaker_core::paths::ProductPaths;
 use tweaker_core::product::{PRODUCT_DIR_NAME, PRODUCT_VERSION, version_string};
 use tweaker_core::sections::{Section, SectionKind};
@@ -293,10 +293,13 @@ struct TweakerApp {
     processes: SystemProcessRunner,
     scheduler: WindowsScheduler,
     appx: WindowsAppx,
-    journal: Option<Journal>,
+    journal: Option<Arc<Journal>>,
     catalog: CatalogView,
     startup: StartupView,
     apps: AppsView,
+    job: Option<ApplyJob>,
+    pending_recovery: Option<usize>,
+    recovery_report: Option<Vec<String>>,
 }
 
 /// One click on the applications screen.
@@ -313,6 +316,38 @@ enum AppsAction {
 enum AppsPending {
     Remove,
     Restore,
+}
+
+/// One long-running apply job executed off the UI thread.
+struct ApplyJob {
+    progress: Arc<Mutex<JobProgress>>,
+    cancel: Arc<AtomicBool>,
+    outcome: Arc<Mutex<Option<JobOutcome>>>,
+}
+
+/// Live progress of the background job.
+#[derive(Default, Clone)]
+struct JobProgress {
+    index: usize,
+    total: usize,
+    action: String,
+}
+
+/// Final result of the background job.
+struct JobOutcome {
+    tweaks: Vec<TweakOutcome>,
+}
+
+/// Result of one tweak inside the background job.
+struct TweakOutcome {
+    title_key: String,
+    applied: usize,
+    skipped: usize,
+    failed: Vec<String>,
+    error: Option<String>,
+    cancelled: bool,
+    freed_bytes: u64,
+    skipped_files: usize,
 }
 
 /// UI state of the applications section.
@@ -345,12 +380,14 @@ struct CatalogView {
     states: Vec<TweakState>,
     preview: Vec<String>,
     pending: Vec<String>,
+    sizes: Vec<Option<u64>>,
     report: Option<Vec<String>>,
 }
 
 /// One click on a catalog screen.
 enum CatalogAction {
     Refresh,
+    Measure,
     BuildPreview,
     Confirm,
     Cancel,
@@ -433,12 +470,28 @@ impl TweakerApp {
         };
         load_catalog(&mut catalog);
         let journal = match Journal::new(paths.journal()) {
-            Ok(journal) => Some(journal),
+            Ok(journal) => Some(Arc::new(journal)),
             Err(error) => {
                 logging::error(&format!("journal: cannot open: {error}"));
                 None
             }
         };
+        let pending_recovery = journal
+            .as_ref()
+            .and_then(|journal| match journal.pending() {
+                Ok(pending) if !pending.is_empty() => {
+                    logging::warn(&format!(
+                        "journal: {} unfinished operations found",
+                        pending.len()
+                    ));
+                    Some(pending.len())
+                }
+                Ok(_) => None,
+                Err(error) => {
+                    logging::warn(&format!("journal: cannot read pending operations: {error}"));
+                    None
+                }
+            });
         Self {
             loc,
             sections,
@@ -461,6 +514,9 @@ impl TweakerApp {
             catalog,
             startup: StartupView::default(),
             apps: AppsView::default(),
+            job: None,
+            pending_recovery,
+            recovery_report: None,
         }
     }
 
@@ -675,6 +731,7 @@ impl TweakerApp {
             Vec::new()
         };
         let about_title = self.loc.t("about.title");
+        let mut recovery_action: Option<bool> = None;
 
         egui::CentralPanel::default().show(ui, |ui| {
             egui::ScrollArea::vertical()
@@ -691,6 +748,41 @@ impl TweakerApp {
                     ui.add_space(10.0);
                     ui.separator();
                     ui.add_space(10.0);
+                    if let Some(count) = self.pending_recovery {
+                        egui::Frame::group(ui.style())
+                            .inner_margin(egui::Margin::same(12))
+                            .show(ui, |ui| {
+                                ui.label(
+                                    egui::RichText::new(
+                                        self.loc
+                                            .fmt("recovery.body", &[("count", &count.to_string())]),
+                                    )
+                                    .size(13.0),
+                                );
+                                ui.horizontal(|ui| {
+                                    if ui.button(self.loc.t("recovery.revert")).clicked() {
+                                        recovery_action = Some(true);
+                                    }
+                                    if ui.button(self.loc.t("recovery.hide")).clicked() {
+                                        recovery_action = Some(false);
+                                    }
+                                });
+                            });
+                        ui.add_space(8.0);
+                    }
+                    if let Some(lines) = &self.recovery_report {
+                        egui::Frame::group(ui.style())
+                            .inner_margin(egui::Margin::same(12))
+                            .show(ui, |ui| {
+                                for line in lines {
+                                    ui.label(line);
+                                }
+                                if ui.button(self.loc.t("recovery.hide")).clicked() {
+                                    recovery_action = Some(false);
+                                }
+                            });
+                        ui.add_space(8.0);
+                    }
                     if section.id == "autorun" {
                         self.draw_autorun(ui);
                     } else if section.id == "apps" {
@@ -724,6 +816,48 @@ impl TweakerApp {
                     }
                 });
         });
+        match recovery_action {
+            Some(true) => self.revert_pending_ops(),
+            Some(false) => {
+                self.pending_recovery = None;
+                self.recovery_report = None;
+            }
+            None => {}
+        }
+    }
+
+    /// Reverts operations that were started but never finished (crash recovery).
+    fn revert_pending_ops(&mut self) {
+        self.pending_recovery = None;
+        let Some(journal) = self.journal.as_ref() else {
+            return;
+        };
+        let engine = Engine::new(
+            &self.registry,
+            &self.files,
+            &self.services,
+            &self.processes,
+            &self.scheduler,
+            journal,
+        )
+        .with_appx(&self.appx);
+        let report = engine.revert_pending();
+        let mut lines = Vec::new();
+        if let Some(error) = &report.error {
+            lines.push(self.loc.fmt("privacy.error", &[("message", error)]));
+        } else if report.reverted.is_empty() {
+            lines.push(self.loc.t("recovery.nothing"));
+        } else {
+            lines.push(self.loc.fmt(
+                "recovery.done",
+                &[("count", &report.reverted.len().to_string())],
+            ));
+        }
+        for failure in &report.failed {
+            lines.push(format!("  • {}", failure.error));
+        }
+        self.recovery_report = Some(lines);
+        self.refresh_catalog_states();
     }
 
     /// Autorun list: five sources, toggle and delete through the engine.
@@ -1184,7 +1318,149 @@ impl TweakerApp {
         self.apps.report = Some(message);
     }
 
+    /// Starts a background run over already planned tweaks.
+    fn start_apply_jobs(&mut self, jobs: Vec<(TweakDefinition, Plan)>) {
+        let Some(journal) = self.journal.as_ref().map(Arc::clone) else {
+            let reason = "the change journal is unavailable".to_owned();
+            self.catalog.report = Some(vec![
+                self.loc
+                    .fmt("privacy.journal_missing", &[("reason", &reason)]),
+            ]);
+            return;
+        };
+        let total = jobs.iter().map(|(_, plan)| plan.steps.len()).sum();
+        let progress = Arc::new(Mutex::new(JobProgress {
+            index: 0,
+            total,
+            action: String::new(),
+        }));
+        let cancel = Arc::new(AtomicBool::new(false));
+        let outcome = Arc::new(Mutex::new(None));
+        let worker_progress = Arc::clone(&progress);
+        let worker_cancel = Arc::clone(&cancel);
+        let worker_outcome = Arc::clone(&outcome);
+        std::thread::spawn(move || {
+            let registry = WindowsRegistry;
+            let files = WindowsFileSystem;
+            let services = WindowsServices;
+            let processes = SystemProcessRunner;
+            let scheduler = WindowsScheduler;
+            let appx = WindowsAppx;
+            let engine = Engine::new(
+                &registry, &files, &services, &processes, &scheduler, &journal,
+            )
+            .with_appx(&appx);
+            let mut current = 0usize;
+            let mut outcomes = Vec::new();
+            for (tweak, plan) in jobs {
+                let title_key = tweak.title_key.clone();
+                let report = engine.apply_with(&tweak, &plan, |_index, _total, action| {
+                    if let Ok(mut state) = worker_progress.lock() {
+                        state.index = current;
+                        state.total = total;
+                        state.action = action.describe();
+                    }
+                    current += 1;
+                    !worker_cancel.load(Ordering::SeqCst)
+                });
+                outcomes.push(TweakOutcome {
+                    title_key,
+                    applied: report.applied.len(),
+                    skipped: report.skipped.len(),
+                    failed: report
+                        .failed
+                        .iter()
+                        .map(|failure| failure.error.clone())
+                        .collect(),
+                    error: report.error,
+                    cancelled: report.cancelled,
+                    freed_bytes: report.freed_bytes,
+                    skipped_files: report.skipped_files,
+                });
+                if report.cancelled {
+                    break;
+                }
+            }
+            if let Ok(mut state) = worker_progress.lock() {
+                state.index = total;
+                state.action.clear();
+            }
+            if let Ok(mut slot) = worker_outcome.lock() {
+                *slot = Some(JobOutcome { tweaks: outcomes });
+            }
+        });
+        self.job = Some(ApplyJob {
+            progress,
+            cancel,
+            outcome,
+        });
+    }
+
+    /// Collects the background result when it is ready and refreshes the states.
+    fn poll_job(&mut self) {
+        let Some(job) = self.job.as_ref() else {
+            return;
+        };
+        let outcome = {
+            let mut slot = job
+                .outcome
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            slot.take()
+        };
+        let Some(outcome) = outcome else {
+            return;
+        };
+        self.job = None;
+        let mut lines = Vec::new();
+        let mut cancelled = false;
+        for item in outcome.tweaks {
+            let title = self.loc.t(&item.title_key);
+            if let Some(error) = item.error {
+                lines.push(format!(
+                    "{title}: {}",
+                    self.loc.fmt("privacy.error", &[("message", &error)])
+                ));
+                continue;
+            }
+            lines.push(format!(
+                "{title}: +{} / ={} / !{}",
+                item.applied,
+                item.skipped,
+                item.failed.len()
+            ));
+            for failure in item.failed {
+                lines.push(format!("  • {failure}"));
+            }
+            if item.freed_bytes > 0 {
+                lines.push(format!(
+                    "  {}",
+                    self.loc
+                        .fmt("cleaner.freed", &[("size", &format_size(item.freed_bytes))])
+                ));
+            }
+            if item.skipped_files > 0 {
+                lines.push(format!(
+                    "  {}",
+                    self.loc.fmt(
+                        "cleaner.skipped",
+                        &[("count", &item.skipped_files.to_string())]
+                    )
+                ));
+            }
+            if item.cancelled {
+                cancelled = true;
+            }
+        }
+        if cancelled {
+            lines.push(self.loc.t("job.cancelled"));
+        }
+        self.catalog.report = Some(lines);
+        self.refresh_catalog_states();
+    }
+
     fn draw_catalog(&mut self, ui: &mut egui::Ui) {
+        self.poll_job();
         if self.catalog.states.len() != self.catalog.tweaks.len() {
             self.refresh_catalog_states();
         }
@@ -1230,10 +1506,13 @@ impl TweakerApp {
             if ui.button(loc.t("privacy.reload")).clicked() {
                 action = Some(CatalogAction::Refresh);
             }
+            if self.catalog.section == "cleaner" && ui.button(loc.t("cleaner.measure")).clicked() {
+                action = Some(CatalogAction::Measure);
+            }
             if ui.button(loc.t("privacy.apply")).clicked() {
                 action = Some(CatalogAction::BuildPreview);
             }
-            if ui.button(loc.t("privacy.revert")).clicked() {
+            if self.catalog.section != "cleaner" && ui.button(loc.t("privacy.revert")).clicked() {
                 action = Some(CatalogAction::Revert);
             }
             ui.label(loc.fmt(
@@ -1250,6 +1529,42 @@ impl TweakerApp {
             );
         }
         ui.add_space(6.0);
+        if let Some(job) = &self.job {
+            let progress = job
+                .progress
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .clone();
+            let fraction = if progress.total == 0 {
+                0.0
+            } else {
+                progress.index as f32 / progress.total as f32
+            };
+            ui.horizontal(|ui| {
+                ui.add(
+                    egui::ProgressBar::new(fraction)
+                        .desired_width(280.0)
+                        .text(loc.fmt(
+                            "job.progress",
+                            &[
+                                ("done", &progress.index.to_string()),
+                                ("total", &progress.total.to_string()),
+                            ],
+                        )),
+                );
+                if ui.button(loc.t("job.cancel")).clicked() {
+                    job.cancel.store(true, Ordering::SeqCst);
+                }
+            });
+            if !progress.action.is_empty() {
+                ui.label(
+                    egui::RichText::new(&progress.action)
+                        .size(11.0)
+                        .color(egui::Color32::from_gray(120)),
+                );
+            }
+            ui.add_space(6.0);
+        }
 
         for (index, row) in rows.iter().enumerate() {
             ui.horizontal(|ui| {
@@ -1257,6 +1572,15 @@ impl TweakerApp {
                     ui.checkbox(&mut selected[index], "");
                 }
                 ui.label(egui::RichText::new(&row.title).size(14.0).strong());
+                if let Some(Some(bytes)) = self.catalog.sizes.get(index) {
+                    ui.label(
+                        egui::RichText::new(
+                            loc.fmt("cleaner.size", &[("size", &format_size(*bytes))]),
+                        )
+                        .size(11.0)
+                        .color(egui::Color32::from_gray(120)),
+                    );
+                }
                 ui.label(
                     egui::RichText::new(&row.risk)
                         .size(11.0)
@@ -1338,6 +1662,7 @@ impl TweakerApp {
         }
         match action {
             Some(CatalogAction::Refresh) => self.refresh_catalog_states(),
+            Some(CatalogAction::Measure) => self.measure_cleaner(),
             Some(CatalogAction::BuildPreview) => self.build_catalog_preview(),
             Some(CatalogAction::Confirm) => self.confirm_catalog(),
             Some(CatalogAction::Cancel) => {
@@ -1383,6 +1708,33 @@ impl TweakerApp {
 
     fn refresh_catalog_states(&mut self) {
         self.catalog.states = self.detect_privacy();
+        if self.catalog.section != "cleaner" {
+            self.catalog.sizes.clear();
+        }
+    }
+
+    /// Measures the cleanup targets on demand: walking system folders takes time.
+    fn measure_cleaner(&mut self) {
+        self.catalog.sizes = self
+            .catalog
+            .tweaks
+            .iter()
+            .map(|tweak| {
+                let paths: Vec<std::path::PathBuf> = tweak
+                    .actions
+                    .iter()
+                    .flat_map(|action| match action {
+                        Action::CleanPaths { paths } => paths.clone(),
+                        _ => Vec::new(),
+                    })
+                    .collect();
+                if paths.is_empty() {
+                    None
+                } else {
+                    self.files.measure(&paths).ok()
+                }
+            })
+            .collect();
     }
 
     fn selected_tweaks(&self) -> Vec<TweakDefinition> {
@@ -1446,6 +1798,10 @@ impl TweakerApp {
     }
 
     fn confirm_catalog(&mut self) {
+        if self.job.is_some() {
+            self.catalog.report = Some(vec![self.loc.t("job.busy")]);
+            return;
+        }
         let ids = std::mem::take(&mut self.catalog.pending);
         if ids.is_empty() {
             self.catalog.preview.clear();
@@ -1460,42 +1816,43 @@ impl TweakerApp {
             self.catalog.preview.clear();
             return;
         }
-        let journal = self.journal.as_ref().expect("checked above");
-        let engine = Engine::new(
-            &self.registry,
-            &self.files,
-            &self.services,
-            &self.processes,
-            &self.scheduler,
-            journal,
-        );
+        let mut jobs: Vec<(TweakDefinition, Plan)> = Vec::new();
         let mut lines = Vec::new();
-        for id in &ids {
-            let Some(tweak) = self.catalog.tweaks.iter().find(|tweak| &tweak.id == id) else {
-                continue;
-            };
-            let title = self.loc.t(&tweak.title_key);
-            let report = engine.apply_tweak(tweak);
-            if let Some(error) = &report.error {
-                lines.push(format!(
-                    "{title}: {}",
-                    self.loc.fmt("privacy.error", &[("message", error)])
-                ));
-                continue;
-            }
-            lines.push(format!(
-                "{title}: +{} / ={} / !{}",
-                report.applied.len(),
-                report.skipped.len(),
-                report.failed.len()
-            ));
-            for failure in &report.failed {
-                lines.push(format!("  • {}", failure.error));
+        {
+            let journal = self.journal.as_ref().expect("checked above");
+            let engine = Engine::new(
+                &self.registry,
+                &self.files,
+                &self.services,
+                &self.processes,
+                &self.scheduler,
+                journal,
+            );
+            for id in &ids {
+                let Some(tweak) = self.catalog.tweaks.iter().find(|tweak| &tweak.id == id) else {
+                    continue;
+                };
+                let title = self.loc.t(&tweak.title_key);
+                match engine.plan(tweak) {
+                    Ok(plan) if plan.is_empty() => {
+                        lines.push(format!("{title}: {}", self.loc.t("privacy.applied")));
+                    }
+                    Ok(plan) => jobs.push((tweak.clone(), plan)),
+                    Err(error) => lines.push(format!(
+                        "{title}: {}",
+                        self.loc
+                            .fmt("privacy.error", &[("message", &error.to_string())])
+                    )),
+                }
             }
         }
         self.catalog.preview.clear();
-        self.catalog.report = Some(lines);
-        self.refresh_catalog_states();
+        if jobs.is_empty() {
+            self.catalog.report = Some(lines);
+            return;
+        }
+        self.start_apply_jobs(jobs);
+        self.catalog.report = None;
     }
 
     fn revert_catalog(&mut self) {
@@ -1700,6 +2057,23 @@ fn revert_message(report: &RevertReport) -> String {
         .map(|failure| failure.error.clone())
         .or_else(|| report.error.clone())
         .unwrap_or_else(|| "revert failed".to_owned())
+}
+
+/// Human-readable byte size for the cleanup preview.
+fn format_size(bytes: u64) -> String {
+    const KB: f64 = 1024.0;
+    const MB: f64 = KB * 1024.0;
+    const GB: f64 = MB * 1024.0;
+    let value = bytes as f64;
+    if value >= GB {
+        format!("{:.1} GB", value / GB)
+    } else if value >= MB {
+        format!("{:.1} MB", value / MB)
+    } else if value >= KB {
+        format!("{:.1} KB", value / KB)
+    } else {
+        format!("{bytes} B")
+    }
 }
 
 /// One click on the autorun screen.

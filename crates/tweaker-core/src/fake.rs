@@ -10,9 +10,9 @@ use std::path::{Path, PathBuf};
 
 use crate::action::{RegistryKey, RegistryValue, ServiceStartMode};
 use crate::adapters::{
-    AdapterError, AppxPackage, FirewallRule, IAppx, IFileSystem, IFirewall, IProcessRunner,
-    IRegistry, IScheduler, IServiceControl, ISystemInfo, OsVersion, ProcessOutput, RegistryTree,
-    ServiceState, ServiceStatus,
+    AdapterError, AppxPackage, CleanStats, FirewallRule, IAppx, IFileSystem, IFirewall,
+    IProcessRunner, IRegistry, IScheduler, IServiceControl, ISystemInfo, OsVersion, ProcessOutput,
+    RegistryTree, ServiceState, ServiceStatus,
 };
 
 fn failure(message: &str) -> AdapterError {
@@ -185,6 +185,8 @@ pub struct FakeFileSystem {
     bytes: RefCell<HashMap<PathBuf, Vec<u8>>>,
     /// When set, every write and delete fails with this text.
     pub fail: RefCell<Option<String>>,
+    /// Files that behave as locked and are skipped by `clean`.
+    pub locked: RefCell<HashSet<PathBuf>>,
 }
 
 impl FakeFileSystem {
@@ -249,6 +251,61 @@ impl IFileSystem for FakeFileSystem {
         self.files.borrow_mut().remove(path);
         self.bytes.borrow_mut().remove(path);
         Ok(())
+    }
+
+    fn measure(&self, paths: &[PathBuf]) -> Result<u64, AdapterError> {
+        let files = self.files.borrow();
+        let bytes = self.bytes.borrow();
+        let mut total = 0u64;
+        for path in paths {
+            for (file, content) in files.iter() {
+                if file.starts_with(path) {
+                    total += content.len() as u64;
+                }
+            }
+            for (file, content) in bytes.iter() {
+                if file.starts_with(path) {
+                    total += content.len() as u64;
+                }
+            }
+        }
+        Ok(total)
+    }
+
+    fn clean(&self, paths: &[PathBuf]) -> Result<CleanStats, AdapterError> {
+        if let Some(message) = self.fail.borrow().as_ref() {
+            return Err(failure(message));
+        }
+        let mut stats = CleanStats::default();
+        let locked = self.locked.borrow().clone();
+        for path in paths {
+            let mut files = self.files.borrow_mut();
+            let doomed: Vec<PathBuf> = files
+                .keys()
+                .filter(|file| file.starts_with(path) && !locked.contains(*file))
+                .cloned()
+                .collect();
+            for file in doomed {
+                if let Some(content) = files.remove(&file) {
+                    stats.freed_bytes += content.len() as u64;
+                }
+            }
+            stats.skipped_files += locked.iter().filter(|file| file.starts_with(path)).count();
+        }
+        for path in paths {
+            let mut bytes = self.bytes.borrow_mut();
+            let doomed: Vec<PathBuf> = bytes
+                .keys()
+                .filter(|file| file.starts_with(path) && !locked.contains(*file))
+                .cloned()
+                .collect();
+            for file in doomed {
+                if let Some(content) = bytes.remove(&file) {
+                    stats.freed_bytes += content.len() as u64;
+                }
+            }
+        }
+        Ok(stats)
     }
 }
 

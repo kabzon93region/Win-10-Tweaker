@@ -138,6 +138,13 @@ pub fn seed(harness: &Harness, tweaks: &[TweakDefinition]) {
                         }
                     }
                 }
+                Action::CleanPaths { paths } => {
+                    for (index, path) in paths.iter().enumerate() {
+                        harness
+                            .files
+                            .put(path.join(format!("cache-{index}.tmp")), "0123456789");
+                    }
+                }
                 Action::AppxRemove { family } => {
                     harness.appx.add(&format!("{family}_8wekyb3d8bbwe"));
                 }
@@ -158,17 +165,29 @@ pub fn check_item(section_id: &str, id: &str) {
     seed(&harness, &section(section_id));
     let tweak = item(section_id, id);
     let engine = harness.engine();
+    let always_work = tweak
+        .actions
+        .iter()
+        .any(|action| matches!(action, Action::CleanPaths { .. }));
+    let irreversible = tweak.actions.iter().any(|action| {
+        matches!(
+            action,
+            Action::CleanPaths { .. } | Action::ProcessRun { .. }
+        )
+    });
     *harness.processes.output.borrow_mut() = ProcessOutput {
         code: Some(0),
         stdout: String::new(),
         stderr: String::new(),
     };
 
-    assert_eq!(
-        engine.detect(&tweak),
-        TweakState::NotApplied,
-        "{id}: the seeded machine must look untouched"
-    );
+    if !always_work {
+        assert_eq!(
+            engine.detect(&tweak),
+            TweakState::NotApplied,
+            "{id}: the seeded machine must look untouched"
+        );
+    }
 
     let plan = engine.plan(&tweak).expect("plan");
     assert_eq!(plan.steps.len(), tweak.actions.len(), "{id}: plan size");
@@ -220,6 +239,7 @@ pub fn check_item(section_id: &str, id: &str) {
                 );
             }
             (Action::ProcessRun { .. } | Action::ProcessRunReversible { .. }, Snapshot::None) => {}
+            (Action::CleanPaths { .. }, Snapshot::None) => {}
             other => panic!("{id}: unexpected state before the action: {other:?}"),
         }
     }
@@ -228,11 +248,13 @@ pub fn check_item(section_id: &str, id: &str) {
     assert!(report.success(), "{id}: apply failed: {report:?}");
     assert!(report.failed.is_empty(), "{id}: {report:?}");
     assert_eq!(report.applied.len(), tweak.actions.len(), "{id}: applied");
-    assert_eq!(
-        engine.detect(&tweak),
-        TweakState::Applied,
-        "{id}: detect after apply"
-    );
+    if !always_work {
+        assert_eq!(
+            engine.detect(&tweak),
+            TweakState::Applied,
+            "{id}: detect after apply"
+        );
+    }
 
     let records = harness.journal.records().expect("journal records");
     assert_eq!(
@@ -255,6 +277,15 @@ pub fn check_item(section_id: &str, id: &str) {
             .all(|record| record.before.is_some()),
         "{id}: every started record carries the state before"
     );
+
+    if irreversible {
+        let revert = engine.revert(id);
+        assert!(
+            !revert.success(),
+            "{id}: irreversible actions must not pretend to revert"
+        );
+        return;
+    }
 
     let again = engine.plan(&tweak).expect("second plan");
     assert!(

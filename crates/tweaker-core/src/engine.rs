@@ -42,6 +42,12 @@ pub struct ApplyReport {
     pub failed: Vec<FailedAction>,
     /// The run stopped early because the journal became unavailable.
     pub aborted: bool,
+    /// The user cancelled the run between actions.
+    pub cancelled: bool,
+    /// Bytes freed by cleanup actions.
+    pub freed_bytes: u64,
+    /// Files left in place by cleanup because they were in use.
+    pub skipped_files: usize,
     /// Planning failed before anything was changed.
     pub error: Option<String>,
 }
@@ -49,7 +55,7 @@ pub struct ApplyReport {
 impl ApplyReport {
     /// `true` when nothing failed and nothing was skipped silently.
     pub fn success(&self) -> bool {
-        self.failed.is_empty() && self.error.is_none() && !self.aborted
+        self.failed.is_empty() && self.error.is_none() && !self.aborted && !self.cancelled
     }
 }
 
@@ -198,11 +204,28 @@ impl<'a> Engine<'a> {
 
     /// Executes a plan. Errors of one action do not stop the others.
     pub fn apply(&self, tweak: &TweakDefinition, plan: &Plan) -> ApplyReport {
+        self.apply_with(tweak, plan, |_, _, _| true)
+    }
+
+    /// Executes a plan and calls `on_step` before every action.
+    ///
+    /// Returning `false` from the callback stops the run before that action;
+    /// the report is marked `cancelled`, and the journal keeps only the actions
+    /// that really ran.
+    pub fn apply_with<F>(&self, tweak: &TweakDefinition, plan: &Plan, mut on_step: F) -> ApplyReport
+    where
+        F: FnMut(usize, usize, &Action) -> bool,
+    {
         let mut report = ApplyReport {
             tweak_id: tweak.id.clone(),
             ..ApplyReport::default()
         };
-        for step in &plan.steps {
+        let total = plan.steps.len();
+        for (index, step) in plan.steps.iter().enumerate() {
+            if !on_step(index, total, &step.action) {
+                report.cancelled = true;
+                break;
+            }
             // Re-check right before the change: the system may have changed since planning.
             match self.satisfied(&tweak.id, &step.action) {
                 Ok(true) => {
@@ -239,9 +262,19 @@ impl<'a> Engine<'a> {
                     break;
                 }
             };
-            let result = self
-                .execute(&step.action)
-                .and_then(|()| self.verify(&step.action));
+            let result = if let Action::CleanPaths { paths } = &step.action {
+                match self.files.clean(paths) {
+                    Ok(stats) => {
+                        report.freed_bytes += stats.freed_bytes;
+                        report.skipped_files += stats.skipped_files;
+                        self.verify(&step.action)
+                    }
+                    Err(error) => Err(error.message),
+                }
+            } else {
+                self.execute(&step.action)
+                    .and_then(|()| self.verify(&step.action))
+            };
             let after = self.snapshot(&step.action).ok();
             if let Err(error) = self.journal.finish_apply(
                 op_id,
@@ -455,6 +488,7 @@ impl<'a> Engine<'a> {
                     .map_err(|error| error.message)?;
                 Ok(!installed)
             }
+            Action::CleanPaths { .. } => Ok(false),
         }
     }
 
@@ -557,6 +591,7 @@ impl<'a> Engine<'a> {
                     .map_err(|error| error.message)?;
                 Ok(Snapshot::Appx(package))
             }
+            Action::CleanPaths { .. } => Ok(Snapshot::None),
         }
     }
 
@@ -639,6 +674,11 @@ impl<'a> Engine<'a> {
             Action::AppxRemove { family } => {
                 self.appx()?.remove(family).map_err(|error| error.message)
             }
+            Action::CleanPaths { paths } => self
+                .files
+                .clean(paths)
+                .map(|_| ())
+                .map_err(|error| error.message),
         }
     }
 
@@ -774,6 +814,7 @@ impl<'a> Engine<'a> {
                     Ok(())
                 }
             }
+            Action::CleanPaths { .. } => Ok(()),
         }
     }
 
@@ -853,6 +894,7 @@ impl<'a> Engine<'a> {
                     .map_err(|error| error.message),
                 None => Ok(()),
             },
+            (Action::CleanPaths { .. }, _) => Err("cleanup cannot be reverted".to_owned()),
             (
                 Action::ProcessRunReversible {
                     revert_program,
@@ -961,6 +1003,7 @@ impl<'a> Engine<'a> {
                     Err(format!("Store package {family} was not restored"))
                 }
             }
+            (Action::CleanPaths { .. }, _) => Err("cleanup cannot be reverted".to_owned()),
             (Action::ProcessRunReversible { .. }, _) => Ok(()),
             (Action::ProcessRun { .. }, _) => Err("this action cannot be reverted".to_owned()),
             _ => Err("journal snapshot does not match the action".to_owned()),
@@ -1176,6 +1219,83 @@ mod tests {
             "{:?}",
             harness.appx.registered.borrow()
         );
+    }
+
+    #[test]
+    fn apply_stops_between_actions_when_cancelled() {
+        let harness = Harness::new("cancel");
+        let first = registry_set(key(), "First", RegistryValue::Dword(1));
+        let second = registry_set(key(), "Second", RegistryValue::Dword(1));
+        let definition = tweak(vec![first, second]);
+        let engine = harness.engine();
+        let plan = engine.plan(&definition).expect("plan");
+        let mut seen = Vec::new();
+        let report = engine.apply_with(&definition, &plan, |index, total, _| {
+            seen.push((index, total));
+            index == 0
+        });
+        assert!(report.cancelled, "{report:?}");
+        assert!(!report.success(), "a cancelled run is not a success");
+        assert_eq!(report.applied.len(), 1, "{report:?}");
+        assert_eq!(seen, [(0, 2), (1, 2)]);
+        let records = harness.journal.records().expect("journal");
+        assert_eq!(records.len(), 2, "{records:?}");
+        assert_eq!(
+            engine.detect(&definition),
+            TweakState::NotApplied,
+            "only the first action ran"
+        );
+    }
+
+    #[test]
+    fn cleanup_reports_freed_bytes_and_cannot_be_reverted() {
+        let harness = Harness::new("clean");
+        harness.files.put(r"C:\Temp\cache.txt", "12345");
+        harness.files.put_bytes(r"C:\Temp\blob.bin", vec![0u8; 7]);
+        harness.files.put(r"C:\Temp\keep\other.txt", "x");
+        harness.files.put(r"C:\Other\keep.txt", "keep");
+        let definition = tweak(vec![Action::CleanPaths {
+            paths: vec![PathBuf::from(r"C:\Temp")],
+        }]);
+        let engine = harness.engine();
+        let report = engine.apply_tweak(&definition);
+        assert!(report.success(), "{report:?}");
+        assert_eq!(report.freed_bytes, 13, "{report:?}");
+        assert!(
+            !harness
+                .files
+                .exists(std::path::Path::new(r"C:\Temp\cache.txt"))
+        );
+        assert!(
+            harness
+                .files
+                .exists(std::path::Path::new(r"C:\Other\keep.txt"))
+        );
+        let revert = engine.revert("PRIV-01");
+        assert!(!revert.success(), "cleanup must not pretend to revert");
+        assert!(!revert.failed.is_empty(), "{revert:?}");
+    }
+
+    #[test]
+    fn cleanup_skips_locked_files() {
+        let harness = Harness::new("clean-locked");
+        let keep = PathBuf::from(r"C:\Temp\locked.tmp");
+        harness.files.put(r"C:\Temp\free.tmp", "12345");
+        harness.files.put(&keep, "123");
+        harness.files.locked.borrow_mut().insert(keep.clone());
+        let definition = tweak(vec![Action::CleanPaths {
+            paths: vec![PathBuf::from(r"C:\Temp")],
+        }]);
+        let report = harness.engine().apply_tweak(&definition);
+        assert!(report.success(), "{report:?}");
+        assert_eq!(report.freed_bytes, 5, "{report:?}");
+        assert_eq!(report.skipped_files, 1, "{report:?}");
+        assert!(
+            !harness
+                .files
+                .exists(std::path::Path::new(r"C:\Temp\free.tmp"))
+        );
+        assert!(harness.files.exists(&keep));
     }
 
     #[test]
