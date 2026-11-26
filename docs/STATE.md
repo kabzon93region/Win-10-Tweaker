@@ -9,7 +9,7 @@
 | Этап | 8 — приёмка: автопроверки и интерфейс пройдены; ВМ, UAC и живые опасные операции отложены (см. TEST_REPORT) |
 | Код | `Cargo.toml`, `crates/tweaker-core`, `crates/tweaker-windows`, `crates/tweaker-app` |
 | Версия | 0.1.0 |
-| Git | `457ebe5` (этап 7); этап 8 — коммит после аудита |
+| Git | `a713a3d` (этап 8) |
 | Сборка | `cargo build --workspace` — успешно; `cargo build --release -p tweaker-app` — успешно |
 | Артефакт | `target/release/wintweaker.exe` — 7 438 336 байт, sha256 `BBD3E4C4062E83E65CCD4DFFC57D154B7C21D785BEF2AAB6A46327D11B59524A` |
 | Тесты | `cargo test --workspace` — 331 passed, 1 ignored (app 24, core 105, core-tests 25+4+18+18+6+5+21+26+22+18, windows 39) |
