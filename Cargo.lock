@@ -1889,6 +1889,7 @@ dependencies = [
 name = "tweaker-windows"
 version = "0.1.0"
 dependencies = [
+ "serde_json",
  "tweaker-core",
  "windows",
  "winreg",

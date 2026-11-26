@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 
 use eframe::egui;
 use tweaker_core::action::{Action, RegistryKey, RegistryRoot, RegistryValue};
-use tweaker_core::adapters::{IFileSystem, IStartup, StartupEntry, StartupSource};
+use tweaker_core::adapters::{IFileSystem, IStartup, ISystemInfo, StartupEntry, StartupSource};
 use tweaker_core::catalog;
 use tweaker_core::engine::{ApplyReport, Engine, RevertReport};
 use tweaker_core::journal::Journal;
@@ -23,6 +23,7 @@ use tweaker_windows::appx::WindowsAppx;
 use tweaker_windows::elevation::{self, ElevationResult};
 use tweaker_windows::files::WindowsFileSystem;
 use tweaker_windows::message;
+use tweaker_windows::os::WindowsSystemInfo;
 use tweaker_windows::process::SystemProcessRunner;
 use tweaker_windows::registry::WindowsRegistry;
 use tweaker_windows::scheduler::WindowsScheduler;
@@ -298,10 +299,10 @@ struct TweakerApp {
     startup: StartupView,
     apps: AppsView,
     job: Option<ApplyJob>,
-    pending_recovery: Option<usize>,
+    sysinfo: SysinfoView,
     recovery_report: Option<Vec<String>>,
+    pending_recovery: Option<usize>,
 }
-
 /// One click on the applications screen.
 enum AppsAction {
     Refresh,
@@ -348,6 +349,14 @@ struct TweakOutcome {
     cancelled: bool,
     freed_bytes: u64,
     skipped_files: usize,
+}
+
+/// UI state of the system information screen.
+#[derive(Default)]
+struct SysinfoView {
+    rows: Vec<(String, String)>,
+    report: Option<String>,
+    loaded: bool,
 }
 
 /// UI state of the applications section.
@@ -515,11 +524,11 @@ impl TweakerApp {
             startup: StartupView::default(),
             apps: AppsView::default(),
             job: None,
+            sysinfo: SysinfoView::default(),
             pending_recovery,
             recovery_report: None,
         }
     }
-
     /// Switches the visible section and loads its catalog data when needed.
     fn select_section(&mut self, index: usize) {
         if index == self.selected {
@@ -785,6 +794,8 @@ impl TweakerApp {
                     }
                     if section.id == "autorun" {
                         self.draw_autorun(ui);
+                    } else if section.id == "sysinfo" {
+                        self.draw_sysinfo(ui);
                     } else if section.id == "apps" {
                         self.draw_apps(ui);
                     } else if has_catalog {
@@ -1102,6 +1113,112 @@ impl TweakerApp {
         let states = tweaks.iter().map(|tweak| engine.detect(tweak)).collect();
         self.apps.tweaks = tweaks;
         self.apps.states = states;
+    }
+
+    /// Reloads the system information report.
+    fn refresh_sysinfo(&mut self) {
+        self.sysinfo.loaded = true;
+        match WindowsSystemInfo.report() {
+            Ok(rows) => {
+                self.sysinfo.rows = rows.into_iter().map(|row| (row.label, row.value)).collect();
+                self.sysinfo.report = None;
+            }
+            Err(error) => {
+                self.sysinfo.rows.clear();
+                self.sysinfo.report =
+                    Some(self.loc.fmt("sysinfo.error", &[("reason", &error.message)]));
+            }
+        }
+    }
+
+    fn sysinfo_text(&self) -> String {
+        self.sysinfo
+            .rows
+            .iter()
+            .map(|(label, value)| format!("{label}: {value}"))
+            .collect::<Vec<_>>()
+            .join("\r\n")
+    }
+
+    /// Saves the report next to the logs, without sending it anywhere.
+    fn save_sysinfo(&mut self) {
+        let text = self.sysinfo_text();
+        let path = self.paths.config().join("sysinfo.txt");
+        if let Some(parent) = path.parent()
+            && let Err(error) = std::fs::create_dir_all(parent)
+        {
+            self.sysinfo.report = Some(
+                self.loc
+                    .fmt("sysinfo.error", &[("reason", &error.to_string())]),
+            );
+            return;
+        }
+        match std::fs::write(&path, text) {
+            Ok(()) => {
+                self.sysinfo.report = Some(
+                    self.loc
+                        .fmt("sysinfo.saved", &[("path", &path.display().to_string())]),
+                );
+            }
+            Err(error) => {
+                self.sysinfo.report = Some(
+                    self.loc
+                        .fmt("sysinfo.error", &[("reason", &error.to_string())]),
+                );
+            }
+        }
+    }
+
+    /// System information: readable report, copy and save, nothing is sent anywhere.
+    fn draw_sysinfo(&mut self, ui: &mut egui::Ui) {
+        if !self.sysinfo.loaded {
+            self.refresh_sysinfo();
+        }
+
+        let mut refresh = false;
+        let mut copy = false;
+        let mut save = false;
+        ui.horizontal(|ui| {
+            if ui.button(self.loc.t("sysinfo.refresh")).clicked() {
+                refresh = true;
+            }
+            if ui.button(self.loc.t("sysinfo.copy")).clicked() {
+                copy = true;
+            }
+            if ui.button(self.loc.t("sysinfo.save")).clicked() {
+                save = true;
+            }
+        });
+        ui.add_space(8.0);
+        let text = self.sysinfo_text();
+        if copy {
+            ui.ctx().copy_text(text.clone());
+            self.sysinfo.report = Some(self.loc.t("sysinfo.copied"));
+        }
+        if refresh {
+            self.refresh_sysinfo();
+        }
+        if save {
+            self.save_sysinfo();
+        }
+        if self.sysinfo.rows.is_empty() {
+            ui.label(self.loc.t("sysinfo.empty"));
+        } else {
+            egui::Grid::new("sysinfo_grid")
+                .num_columns(2)
+                .spacing([16.0, 6.0])
+                .show(ui, |ui| {
+                    for (label, value) in &self.sysinfo.rows {
+                        ui.label(egui::RichText::new(label).strong());
+                        ui.add(egui::Label::new(value).wrap());
+                        ui.end_row();
+                    }
+                });
+        }
+        if let Some(report) = &self.sysinfo.report {
+            ui.add_space(10.0);
+            ui.label(report);
+        }
     }
 
     /// Applications screen: a tile per package, removal and restore with confirmation.

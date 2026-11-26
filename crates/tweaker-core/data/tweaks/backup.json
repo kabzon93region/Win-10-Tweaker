@@ -1,0 +1,83 @@
+[
+  {
+    "id": "BKP-01",
+    "section": "backup",
+    "titleKey": "tweak.BKP-01.title",
+    "descriptionKey": "tweak.BKP.description",
+    "risk": "low",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "process_run",
+        "program": "powershell.exe",
+        "args": [
+          "-NoProfile",
+          "-NonInteractive",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-Command",
+          "Enable-ComputerRestore -Drive \"$env:SystemDrive\\\" -ErrorAction SilentlyContinue; Checkpoint-Computer -Description 'WinTweaker' -RestorePointType MODIFY_SETTINGS -ErrorAction Stop"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "BKP-02",
+    "section": "backup",
+    "titleKey": "tweak.BKP-02.title",
+    "descriptionKey": "tweak.BKP.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "process_run",
+        "program": "rstrui.exe",
+        "args": []
+      }
+    ]
+  },
+  {
+    "id": "BKP-03",
+    "section": "backup",
+    "titleKey": "tweak.BKP-03.title",
+    "descriptionKey": "tweak.BKP.description",
+    "risk": "low",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "process_run",
+        "program": "powershell.exe",
+        "args": [
+          "-NoProfile",
+          "-NonInteractive",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-Command",
+          "$d=Join-Path $env:LOCALAPPDATA 'WinTweaker\\backups\\drivers';New-Item -ItemType Directory -Force -Path $d|Out-Null;Export-WindowsDriver -Online -Destination $d"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "BKP-04",
+    "section": "backup",
+    "titleKey": "tweak.BKP-04.title",
+    "descriptionKey": "tweak.BKP.description",
+    "risk": "high",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "process_run",
+        "program": "powershell.exe",
+        "args": [
+          "-NoProfile",
+          "-NonInteractive",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-Command",
+          "$d=Join-Path $env:LOCALAPPDATA 'WinTweaker\\backups\\drivers';if(-not (Test-Path -LiteralPath $d)){throw 'Сначала экспортируйте драйверы'};$files=@(Get-ChildItem -LiteralPath $d -Filter *.inf -Recurse);if($files.Count -eq 0){throw 'В папке нет .inf файлов для импорта'};$failed=0;$files|ForEach-Object{pnputil /add-driver $_.FullName /install;if($LASTEXITCODE -ne 0){$failed++}};if($failed -gt 0){exit 1}"
+        ]
+      }
+    ]
+  }
+]

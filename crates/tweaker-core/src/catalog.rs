@@ -17,6 +17,8 @@ const CONTEXT_JSON: &str = include_str!("../data/tweaks/context.json");
 const APPS_JSON: &str = include_str!("../data/tweaks/apps.json");
 const CLEANER_JSON: &str = include_str!("../data/tweaks/cleaner.json");
 const OPTIMIZATION_JSON: &str = include_str!("../data/tweaks/optimization.json");
+const MAINTENANCE_JSON: &str = include_str!("../data/tweaks/maintenance.json");
+const BACKUP_JSON: &str = include_str!("../data/tweaks/backup.json");
 
 /// Problems found while loading the embedded catalog.
 #[derive(Debug)]
@@ -98,6 +100,16 @@ pub fn load_optimization() -> Result<Vec<TweakDefinition>, CatalogError> {
     load(OPTIMIZATION_JSON, "optimization")
 }
 
+/// Loads the maintenance list.
+pub fn load_maintenance() -> Result<Vec<TweakDefinition>, CatalogError> {
+    load(MAINTENANCE_JSON, "maintenance")
+}
+
+/// Loads the backup list.
+pub fn load_backup() -> Result<Vec<TweakDefinition>, CatalogError> {
+    load(BACKUP_JSON, "backup")
+}
+
 /// Loads a catalog section by its id.
 ///
 /// `Ok(None)` means the section is not a catalog (a tool screen) or its data has
@@ -112,6 +124,8 @@ pub fn load_section(section: &str) -> Result<Option<Vec<TweakDefinition>>, Catal
         "apps" => load_apps().map(Some),
         "cleaner" => load_cleaner().map(Some),
         "optimization" => load_optimization().map(Some),
+        "maintenance" => load_maintenance().map(Some),
+        "backup" => load_backup().map(Some),
         _ => Ok(None),
     }
 }

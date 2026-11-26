@@ -1,0 +1,123 @@
+[
+  {
+    "id": "FIX-01",
+    "section": "maintenance",
+    "titleKey": "tweak.FIX-01.title",
+    "descriptionKey": "tweak.FIX.description",
+    "risk": "medium",
+    "requiresReboot": true,
+    "actions": [
+      {
+        "kind": "process_run_reversible",
+        "program": "bcdedit.exe",
+        "args": ["/set", "{default}", "bootmenupolicy", "legacy"],
+        "revert_program": "bcdedit.exe",
+        "revert_args": ["/set", "{default}", "bootmenupolicy", "standard"]
+      }
+    ]
+  },
+  {
+    "id": "FIX-02",
+    "section": "maintenance",
+    "titleKey": "tweak.FIX-02.title",
+    "descriptionKey": "tweak.FIX.description",
+    "risk": "low",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "registry_set",
+        "key": { "root": "hkcr", "path": "MSI\\shell\\unpack\\command" },
+        "name": "",
+        "value": { "kind": "string", "data": "msiexec /a \"%1\" /qb TARGETDIR=\"%2\"" }
+      }
+    ]
+  },
+  {
+    "id": "FIX-03",
+    "section": "maintenance",
+    "titleKey": "tweak.FIX-03.title",
+    "descriptionKey": "tweak.FIX.description",
+    "risk": "low",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "registry_set",
+        "key": { "root": "hkcu", "path": "Software\\Microsoft\\MicrosoftEdge\\Main" },
+        "name": "AllowPrelaunch",
+        "value": { "kind": "dword", "data": 0 }
+      }
+    ]
+  },
+  {
+    "id": "FIX-04",
+    "section": "maintenance",
+    "titleKey": "tweak.FIX-04.title",
+    "descriptionKey": "tweak.FIX.description",
+    "risk": "low",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "registry_set",
+        "key": { "root": "hkcr", "path": "Directory\\shell\\cmd" },
+        "name": "",
+        "value": { "kind": "string", "data": "Открыть командную строку" }
+      },
+      {
+        "kind": "registry_set",
+        "key": { "root": "hkcr", "path": "Directory\\shell\\cmd\\command" },
+        "name": "",
+        "value": { "kind": "string", "data": "cmd.exe /s /k pushd \"%V\"" }
+      },
+      {
+        "kind": "registry_set",
+        "key": { "root": "hkcr", "path": "Directory\\Background\\shell\\cmd" },
+        "name": "",
+        "value": { "kind": "string", "data": "Открыть командную строку" }
+      },
+      {
+        "kind": "registry_set",
+        "key": { "root": "hkcr", "path": "Directory\\Background\\shell\\cmd\\command" },
+        "name": "",
+        "value": { "kind": "string", "data": "cmd.exe /s /k pushd \"%V\"" }
+      }
+    ]
+  },
+  {
+    "id": "FIX-05",
+    "section": "maintenance",
+    "titleKey": "tweak.FIX-05.title",
+    "descriptionKey": "tweak.FIX.description",
+    "risk": "low",
+    "requiresReboot": true,
+    "actions": [
+      {
+        "kind": "registry_set",
+        "key": { "root": "hkcu", "path": "Control Panel\\Keyboard" },
+        "name": "InitialKeyboardIndicators",
+        "value": { "kind": "string", "data": "2" }
+      }
+    ]
+  },
+  {
+    "id": "FIX-06",
+    "section": "maintenance",
+    "titleKey": "tweak.FIX-06.title",
+    "descriptionKey": "tweak.FIX.description",
+    "risk": "medium",
+    "requiresReboot": false,
+    "actions": [
+      {
+        "kind": "process_run",
+        "program": "powershell.exe",
+        "args": [
+          "-NoProfile",
+          "-NonInteractive",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-Command",
+          "$roots=@([Environment]::GetFolderPath('Desktop'),[Environment]::GetFolderPath('StartMenu'));$shell=New-Object -ComObject WScript.Shell;foreach($r in $roots){Get-ChildItem -LiteralPath $r -Filter *.lnk -Recurse -Force -ErrorAction SilentlyContinue|ForEach-Object{$t=$shell.CreateShortcut($_.FullName).TargetPath;if($t -and -not (Test-Path -LiteralPath $t)){Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue}}}"
+        ]
+      }
+    ]
+  }
+]

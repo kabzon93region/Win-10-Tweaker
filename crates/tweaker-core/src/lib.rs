@@ -28,8 +28,8 @@ pub use adapters::{
     OsVersion, ProcessOutput, ServiceState, ServiceStatus, StartupEntry, StartupSource,
 };
 pub use catalog::{
-    CatalogError, load_apps, load_cleaner, load_optimization, load_privacy, load_section,
-    load_services,
+    CatalogError, load_apps, load_backup, load_cleaner, load_maintenance, load_optimization,
+    load_privacy, load_section, load_services,
 };
 pub use engine::{ApplyReport, Engine, FailedAction, PlanError, RevertReport};
 pub use journal::{AppliedOp, Journal, JournalRecord, Phase, Snapshot};

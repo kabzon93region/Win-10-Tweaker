@@ -298,8 +298,19 @@ pub trait IAppx {
     fn register(&self, manifest: &Path) -> Result<(), AdapterError>;
 }
 
+/// One line of the system information report.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReportRow {
+    /// Short technical label, e.g. `CPU`.
+    pub label: String,
+    /// Value as read from the system.
+    pub value: String,
+}
+
 /// Read-only information about the operating system.
 pub trait ISystemInfo {
     /// Windows version.
     fn os_version(&self) -> Result<OsVersion, AdapterError>;
+    /// Full report for the sysinfo screen; labels are technical and not localized.
+    fn report(&self) -> Result<Vec<ReportRow>, AdapterError>;
 }

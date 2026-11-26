@@ -12,7 +12,7 @@ use crate::action::{RegistryKey, RegistryValue, ServiceStartMode};
 use crate::adapters::{
     AdapterError, AppxPackage, CleanStats, FirewallRule, IAppx, IFileSystem, IFirewall,
     IProcessRunner, IRegistry, IScheduler, IServiceControl, ISystemInfo, OsVersion, ProcessOutput,
-    RegistryTree, ServiceState, ServiceStatus,
+    RegistryTree, ReportRow, ServiceState, ServiceStatus,
 };
 
 fn failure(message: &str) -> AdapterError {
@@ -586,6 +586,16 @@ impl Default for FakeSystemInfo {
 impl ISystemInfo for FakeSystemInfo {
     fn os_version(&self) -> Result<OsVersion, AdapterError> {
         Ok(self.version)
+    }
+
+    fn report(&self) -> Result<Vec<ReportRow>, AdapterError> {
+        Ok(vec![ReportRow {
+            label: "OS".to_owned(),
+            value: format!(
+                "Windows {}.{}.{}",
+                self.version.major, self.version.minor, self.version.build
+            ),
+        }])
     }
 }
 

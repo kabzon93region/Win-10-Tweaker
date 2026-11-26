@@ -252,7 +252,7 @@ mod tests {
     ];
 
     /// Exact number of interface strings shipped in each language.
-    const KEY_COUNT: usize = 373;
+    const KEY_COUNT: usize = 392;
 
     #[test]
     fn both_catalogs_load_and_have_equal_keys() {
@@ -288,6 +288,8 @@ mod tests {
         tweaks.extend(tweaker_core::catalog::load_apps().expect("apps catalog"));
         tweaks.extend(tweaker_core::catalog::load_cleaner().expect("cleaner catalog"));
         tweaks.extend(tweaker_core::catalog::load_optimization().expect("optimization catalog"));
+        tweaks.extend(tweaker_core::catalog::load_maintenance().expect("maintenance catalog"));
+        tweaks.extend(tweaker_core::catalog::load_backup().expect("backup catalog"));
         for tweak in tweaks {
             for key in [&tweak.title_key, &tweak.description_key] {
                 for lang in Lang::ALL {
