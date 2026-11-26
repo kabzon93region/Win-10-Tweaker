@@ -9,7 +9,7 @@
 | Этап | 7 — сервисные разделы — частично: sysinfo, backup 4/4, maintenance 6/6, about; профиль/обновления/VirusTotal — D-46…D-48 |
 | Код | `Cargo.toml`, `crates/tweaker-core`, `crates/tweaker-windows`, `crates/tweaker-app` |
 | Версия | 0.1.0 |
-| Git | `dc75b0c` (этап 6); этап 7 — коммит после аудита |
+| Git | `79556f8` (этап 7) |
 | Сборка | `cargo build --workspace` — успешно; `cargo build --release -p tweaker-app` — успешно |
 | Артефакт | `target/release/wintweaker.exe` — 7 438 336 байт, sha256 `BBD3E4C4062E83E65CCD4DFFC57D154B7C21D785BEF2AAB6A46327D11B59524A` |
 | Тесты | `cargo test --workspace` — 331 passed, 1 ignored (app 24, core 105, core-tests 25+4+18+18+6+5+21+26+22+18, windows 39) |
