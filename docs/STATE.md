@@ -9,7 +9,7 @@
 | Этап | 6 — очистка и оптимизация — завершён; 16 из 18 пунктов очистки и 4 из 6 оптимизации, исключения — в D-39 |
 | Код | `Cargo.toml`, `crates/tweaker-core`, `crates/tweaker-windows`, `crates/tweaker-app` |
 | Версия | 0.1.0 |
-| Git | `f0813e5` (этап 5, часть 6); этап 6 — коммит после аудита |
+| Git | `5bb3153` (этап 6) |
 | Сборка | `cargo build --workspace` — успешно; `cargo build --release -p tweaker-app` — успешно |
 | Артефакт | `target/release/wintweaker.exe` — 7 379 456 байт, sha256 `0E88BC690988919AA6346B129F793622A93C229560DDBCBDC0402F1DD6800441` |
 | Тесты | `cargo test --workspace` — 319 passed, 1 ignored (app 24, core 105, core-tests 25+18+5+21+26+22+18, windows 37) |
