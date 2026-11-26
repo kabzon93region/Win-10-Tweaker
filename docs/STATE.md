@@ -13,7 +13,7 @@
 | Сборка | `cargo build --workspace` — успешно; `cargo build --release -p tweaker-app` — успешно |
 | Артефакт | `target/release/wintweaker.exe` — 7 438 336 байт, sha256 `BBD3E4C4062E83E65CCD4DFFC57D154B7C21D785BEF2AAB6A46327D11B59524A` |
 | Тесты | `cargo test --workspace` — 331 passed, 1 ignored (app 24, core 105, core-tests 25+4+18+18+6+5+21+26+22+18, windows 39) |
-| Проверки | clippy/fmt чисто; снимки `services.png`, `ui.png`, `system.png`, `context.png`, `autorun3.png`, `apps2.png`, `cleaner.png`, `optimization.png`, `sysinfo.png`, `backup.png`, `maintenance.png`; sysinfo — реальный отчёт с копированием и сохранением; `--selftest` rc=0 |
+| Проверки | clippy/fmt чисто; снимки `services.png`, `ui.png`, `system.png`, `context.png`, `autorun3.png`, `apps2.png`, `cleaner.png`, `optimization.png`, `sysinfo.png`, `backup.png`, `maintenance.png`; sysinfo — реальный отчёт с копированием и сохранением; `--selftest` rc=0; все 14 разделов открываются с кодом 0 (снимки `auto-*.png`, самый долгий `sysinfo` ≈5 с) |
 | Запуск | release `--selftest` 414 мс, `--smoke` 3,08 с (с удержанием окна 2,5 с); замер под UAC не выполнялся |
 | Блокирует | нет; D-2 и D-8 закрыты на этапе 6, открыты D-3…D-7 |
 
@@ -51,7 +51,7 @@
 | Этап | Содержание | Критерий готовности | Статус |
 |---|---|---|---|
 | 0 | Согласование стека, платной версии, поддержки Windows 7 | решения записаны в `DECISIONS.md` | завершён |
-| 1 | Каркас решения: workspace, окно, меню разделов, ru/en, логи, манифест, `--selftest` | сборка, тесты, `--selftest` rc=0 | завершён |
+| 1 | Каркас решения: workspace, окно, меню разделов, ru/en, логи, манифест, `--selftest` | сборка, тесты, `--selftest` rc=0; все 14 разделов открываются с кодом 0 (снимки `auto-*.png`, самый долгий `sysinfo` ≈5 с) | завершён |
 | 2 | Движок: модели `Tweak/Plan/Action`, адаптеры-интерфейсы, журнал JSONL, apply/detect/revert на одном пункте | unit-тесты на фейковых адаптерах зелёные | завершён |
 | 3 | Первый раздел каталога — `privacy` (17 пунктов) | все 17 пунктов применяются и откатываются | завершён |
 | 4 | Тесты: unit по разделу, смоук и негативные сценарии по `TESTPLAN.md` | отчёт о тестировании | завершён |
@@ -90,7 +90,7 @@
 | Юнит-тесты | `crates/*/src/**` (`#[cfg(test)]`) | 168 passed, 1 ignored (app 24, core 105, windows 39) |
 | Отчёт о тестировании | `docs/TEST_REPORT.md` | итоговая приёмка этапа 8: 331 тест, selftest/smoke rc=0, воспроизводимая сборка; ВМ/UAC/живые опасные операции отложены |
 | Карта кода | `docs/CODE_MAP.md` | обновлена на этапе 7 |
-| Отчёт самопроверки | `%LocalAppData%\WinTweaker\logs\wintweaker.log` | `--selftest` rc=0 |
+| Отчёт самопроверки | `%LocalAppData%\WinTweaker\logs\wintweaker.log` | `--selftest` rc=0; все 14 разделов открываются с кодом 0 (снимки `auto-*.png`, самый долгий `sysinfo` ≈5 с) |
 | Снимки окна | `%TEMP%\wintweaker-run\{services,ui,system,context,autorun3,apps2,cleaner,optimization,sysinfo,backup,maintenance}.png` (вне git) | 1200×780, сняты самим приложением |
 | Release-бинарник | `target/release/wintweaker.exe` (не в git) | см. «Артефакт» выше |
 
